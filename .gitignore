@@ -4,3 +4,4 @@ target/
 .env.*
 node_modules/
 /sets/private/
+__pycache__/
