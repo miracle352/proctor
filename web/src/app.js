@@ -69,9 +69,10 @@ function renderModels() {
     </label>`;
   }).join("");
 }
+const rank = (id) => (id.startsWith("money-") ? 0 : id.includes("-twin-") ? 1 : id.startsWith("hard-") ? 2 : 3);
 function usableSets() {
   return Object.entries(D.sets).filter(([, s]) => !s.revealed && s.runs < s.retire_after * s.size)
-    .sort(([a], [b]) => (a.includes("twin") ? -1 : 0) - (b.includes("twin") ? -1 : 0) || a.localeCompare(b));
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
 }
 function renderSets() {
   const list = usableSets();
