@@ -19,6 +19,10 @@ struct Input {
     count: usize,
     #[serde(default = "default_max_tokens")]
     max_tokens: u32,
+    /// An agent's own instructions. When present the model sits the exam as
+    /// that agent, and the report carries the hash of these exact words.
+    #[serde(default)]
+    system_prompt: Option<String>,
 }
 
 fn default_count() -> usize {
@@ -69,9 +73,16 @@ fn main() {
     let end = (input.start + input.count).min(set.items.len());
     let slice = set.items.get(input.start..end).unwrap_or(&[]);
     let mut report = Report::new(&set, set_sha256, &input.model, sealed, input.start, slice.len());
+    let system = match &input.system_prompt {
+        Some(p) => {
+            report.agent_prompt_sha256 = Some(sha256_hex(p.as_bytes()));
+            format!("{p}\n\n{INSTRUCTION}")
+        }
+        None => INSTRUCTION.to_string(),
+    };
 
     let prompts: Vec<&str> = slice.iter().map(|i| i.prompt.as_str()).collect();
-    let answers = net::ask_all(&api_key, &input.model, &prompts, input.max_tokens);
+    let answers = net::ask_all(&api_key, &input.model, &system, &prompts, input.max_tokens);
     for (item, answer) in slice.iter().zip(answers) {
         match answer {
             Ok((text, chat_id)) => report.record_with_stakes(item, &text, chat_id),
@@ -86,13 +97,13 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 mod net {
-    use super::{API, INSTRUCTION};
+    use super::API;
     use serde_json::Value;
     use std::time::Duration;
     use wasi_http_client::Client;
 
     /// All prompts are sent at once; answers come back in the same order.
-    pub fn ask_all(api_key: &str, model: &str, prompts: &[&str], max_tokens: u32) -> Vec<Result<(String, String), String>> {
+    pub fn ask_all(api_key: &str, model: &str, system: &str, prompts: &[&str], max_tokens: u32) -> Vec<Result<(String, String), String>> {
         let send = |idx: &[usize], plain: bool| {
             let posts: Vec<crate::conc::Post> = idx
                 .iter()
@@ -100,7 +111,7 @@ mod net {
                     authority: "cloud-api.near.ai",
                     path: "/v1/chat/completions",
                     bearer: api_key,
-                    body: proctor_grader::request_body(model, INSTRUCTION, prompts[i], max_tokens, plain).to_string().into_bytes(),
+                    body: proctor_grader::request_body(model, system, prompts[i], max_tokens, plain).to_string().into_bytes(),
                 })
                 .collect();
             crate::conc::post_all(&posts, 150)
@@ -154,7 +165,7 @@ mod conc;
 // Native builds exist only so `cargo test` works on a laptop.
 #[cfg(not(target_arch = "wasm32"))]
 mod net {
-    pub fn ask_all(_: &str, _: &str, prompts: &[&str], _: u32) -> Vec<Result<(String, String), String>> {
+    pub fn ask_all(_: &str, _: &str, _: &str, prompts: &[&str], _: u32) -> Vec<Result<(String, String), String>> {
         prompts.iter().map(|_| Err("network is only wired up in the wasm build".into())).collect()
     }
     pub fn model_is_verifiable(_: &str, _: &str) -> Result<bool, String> {

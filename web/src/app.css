@@ -170,3 +170,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--i
 .dev-table a, .hint a { color: var(--blue); }
 @media (max-width: 760px) { .tiles4 { grid-template-columns: 1fr 1fr; } .snips { grid-template-columns: 1fr; } }
 #lic-badges { flex-wrap: wrap; gap: 0.6rem; }
+.agent-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1rem; align-items: start; }
+.agent-card { background: var(--paper); border-radius: 16px; padding: 1.1rem 1.2rem; display: grid; gap: 0.7rem; margin-bottom: 0.7rem; animation: rise 0.4s var(--ease) both; }
+.agent-card .ac-top { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.agent-card b { font: 700 1.2rem/1.2 var(--display); display: block; } .agent-card small { color: var(--mute); font-size: 0.88rem; }
+.agent-card .btn { white-space: normal; justify-self: start; }
+.stamp { font: 800 0.9rem/1 var(--display); padding: 0.5rem 0.7rem; border-radius: 10px; border: 2.5px solid currentColor; transform: rotate(-4deg); color: var(--red-ink); white-space: nowrap; }
+.stamp.yes { color: var(--green-ink); }
+@media (max-width: 1000px) { .agent-grid { grid-template-columns: 1fr; } }

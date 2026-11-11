@@ -150,6 +150,9 @@ pub struct Report {
     pub results: String,
     /// Sum of `loss` over questions answered wrongly, in milliNEAR.
     pub lost_milli: u64,
+    /// sha256 of the agent instructions the model ran under, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_prompt_sha256: Option<String>,
 }
 
 impl Report {
@@ -169,6 +172,7 @@ impl Report {
             failures: 0,
             results: String::new(),
             lost_milli: 0,
+            agent_prompt_sha256: None,
         }
     }
 

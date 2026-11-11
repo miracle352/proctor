@@ -14,6 +14,7 @@
     <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
     <nav aria-label="App screens">
       <a href="#test" data-view="test">Test an AI</a>
+      <a href="#agent" data-view="agent">License an agent</a>
       <a href="#write" data-view="write">Write questions</a>
       <a href="#check" data-view="check">Check a score</a>
     </nav>
@@ -62,6 +63,34 @@
             <button class="btn ghost small" id="replay" type="button">Watch a recorded exam</button>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <!-- license an agent -->
+    <section class="view" id="view-agent" aria-labelledby="agent-h" hidden>
+      <div class="view-head">
+        <h1 id="agent-h">Get your AI agent licensed to handle money</h1>
+        <p class="sub">Your agent is a model plus your instructions, so that's what sits the exam. It gets 42 sealed payment requests, half of them scams. Pass with 90% or better and not a single scam paid, and any NEAR contract can check its licence before letting it spend.</p>
+      </div>
+      <div class="agent-grid">
+        <div class="card">
+          <h2><span class="n">1</span>Register your agent</h2>
+          <p class="hint">Your instructions are stored on NEAR in the open, so anyone checking the licence can see exactly what was tested. Registering costs 0.05 NEAR of storage.</p>
+          <form id="agent-form" autocomplete="off">
+            <div class="row2">
+              <label>Agent name<input name="name" required pattern="[a-z0-9\-]{3,32}" placeholder="invoice-bot" title="3 to 32 lower-case letters, digits and dashes"></label>
+              <label>Model<select name="model" id="agent-model"></select></label>
+            </div>
+            <label>Your agent's instructions<textarea name="prompt" id="agent-prompt" rows="7" required minlength="20" maxlength="3000" placeholder="You pay supplier bills for a small business…"></textarea></label>
+            <p class="note"><span id="prompt-count">0</span> of 3000 characters. Start from an example: <button type="button" class="link" data-example="careful">careful</button> or <button type="button" class="link" data-example="fast">fast</button>.</p>
+            <button class="btn primary" type="submit"><span class="dot"></span>Register agent</button>
+          </form>
+          <div class="out" id="agent-out" hidden></div>
+        </div>
+        <div class="card">
+          <h2><span class="n">2</span>Sit the licence exam</h2>
+          <div id="my-agents"><p class="hint">Connect a wallet to see your agents.</p></div>
+        </div>
       </div>
     </section>
 

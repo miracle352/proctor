@@ -41,9 +41,13 @@ def main():
         signer = args[i + 1]
         del args[i:i + 2]
     set_id, model, start, count = args[0], args[1], int(args[2]), int(args[3])
-    payload = json.dumps({"set_id": set_id, "model": model, "start": start, "count": count})
+    # an agent id ("agent:owner/name") sits the exam under its own instructions
+    if model.startswith("agent:"):
+        method, payload = "request_agent_run", json.dumps({"agent_id": model, "set_id": set_id, "start": start, "count": count})
+    else:
+        method, payload = "request_run", json.dumps({"set_id": set_id, "model": model, "start": start, "count": count})
     out = subprocess.run(
-        ["near", "contract", "call-function", "as-transaction", CONTRACT, "request_run", "json-args", payload,
+        ["near", "contract", "call-function", "as-transaction", CONTRACT, method, "json-args", payload,
          "prepaid-gas", "300 Tgas", "attached-deposit", "0.5 NEAR", "sign-as", signer,
          "network-config", "testnet", "sign-with-legacy-keychain", "send"],
         capture_output=True, text=True)

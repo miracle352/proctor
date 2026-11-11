@@ -127,6 +127,8 @@ struct Report {
     /// What wrong answers on questions with stakes cost, in milliNEAR.
     #[serde(default)]
     lost_milli: u64,
+    #[serde(default)]
+    agent_prompt_sha256: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -148,6 +150,25 @@ pub struct PendingRun {
     /// owner, who pays NEAR AI Cloud. Refunded if the run fails.
     #[serde(default)]
     pub ai_fee: U128,
+    /// Set when an agent sits the exam: its id and the hash of its instructions.
+    #[serde(default)]
+    pub agent: Option<String>,
+    #[serde(default)]
+    pub agent_sha: Option<String>,
+}
+
+/// A builder's agent: a model plus the instructions it runs under. Its exam
+/// results and licence are its own, separate from the bare model's.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Agent {
+    pub id: String,
+    pub owner: AccountId,
+    pub name: String,
+    pub model: String,
+    pub prompt: String,
+    pub prompt_sha256: String,
+    pub block_height: u64,
 }
 
 /// Usage in one UTC day: (day number, questions asked).
@@ -202,10 +223,11 @@ pub struct Proctor {
     marked: LookupMap<String, bool>,
     /// model|set -> first answers asked, right, and when last answered.
     tallies: LookupMap<String, Tally3>,
+    agents: IterableMap<String, Agent>,
 }
 
 #[near(serializers = [borsh])]
-struct ProctorV2 {
+struct ProctorV3 {
     owner: AccountId,
     outlayer: AccountId,
     grader_project: String,
@@ -225,7 +247,22 @@ struct ProctorV2 {
     cap_total: u32,
     usage: LookupMap<AccountId, DayCount>,
     usage_total: DayCount,
+    /// Each AI's own wallet, in yoctoNEAR. A scam it approves is paid out of it.
+    wallets: IterableMap<String, u128>,
+    /// Total each AI has lost to scams, in yoctoNEAR.
+    lost: IterableMap<String, u128>,
+    /// Where approved scams send the money: the scammer.
+    scam_sink: AccountId,
+    /// Certificate id -> what that run cost the AI.
+    cert_losses: LookupMap<u64, u128>,
+    /// What a licence for each skill requires.
+    skills: IterableMap<String, Skill>,
+    /// First answer per model, set and question; retries don't count.
+    marked: LookupMap<String, bool>,
+    /// model|set -> first answers asked, right, and when last answered.
+    tallies: LookupMap<String, Tally3>,
 }
+
 
 /// A licence: pass `pass_percent` over at least `min_questions` first
 /// answers on these sets. It lapses `valid_days` after the last answer.
@@ -272,13 +309,14 @@ impl Proctor {
             skills: IterableMap::new(b"k"),
             marked: LookupMap::new(b"x"),
             tallies: LookupMap::new(b"t"),
+            agents: IterableMap::new(b"g"),
         }
     }
 
     #[private]
     #[init(ignore_state)]
-    pub fn migrate(scam_sink: AccountId) -> Self {
-        let old: ProctorV2 = env::state_read().expect("no state to migrate");
+    pub fn migrate() -> Self {
+        let old: ProctorV3 = env::state_read().expect("no state to migrate");
         Self {
             owner: old.owner,
             outlayer: old.outlayer,
@@ -294,13 +332,14 @@ impl Proctor {
             cap_total: old.cap_total,
             usage: old.usage,
             usage_total: old.usage_total,
-            wallets: IterableMap::new(b"w"),
-            lost: IterableMap::new(b"l"),
-            scam_sink,
-            cert_losses: LookupMap::new(b"q"),
-            skills: IterableMap::new(b"k"),
-            marked: LookupMap::new(b"x"),
-            tallies: LookupMap::new(b"t"),
+            wallets: old.wallets,
+            lost: old.lost,
+            scam_sink: old.scam_sink,
+            cert_losses: old.cert_losses,
+            skills: old.skills,
+            marked: old.marked,
+            tallies: old.tallies,
+            agents: IterableMap::new(b"g"),
         }
     }
 
@@ -403,6 +442,46 @@ impl Proctor {
     /// OutLayer does not use comes back to the caller.
     #[payable]
     pub fn request_run(&mut self, set_id: String, model: String, start: u32, count: u32) -> Promise {
+        self.start_run(set_id, model, start, count, None)
+    }
+
+    /// Register an agent: a model plus the instructions it runs under. The
+    /// instructions are public, so anyone can see exactly what was licensed.
+    #[payable]
+    pub fn register_agent(&mut self, name: String, model: String, prompt: String) -> String {
+        require!(name.len() >= 3 && name.len() <= 32 && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'), "name: 3 to 32 lower-case letters, digits or dashes");
+        require!(prompt.len() >= 20 && prompt.len() <= 3000, "instructions must be 20 to 3000 characters");
+        let owner = env::predecessor_account_id();
+        require!(self.public_models.get(&model).is_some() || owner == self.owner || self.trusted.contains(&owner), "this model isn't open to the public yet");
+        require!(env::attached_deposit() >= NearToken::from_millinear(50), "attach 0.05 NEAR to cover storage");
+        let id = format!("agent:{}/{}", owner, name);
+        require!(self.agents.get(&id).is_none(), "you already have an agent with this name");
+        let agent = Agent { id: id.clone(), owner, name, model, prompt_sha256: hex(&env::sha256(prompt.as_bytes())), prompt, block_height: env::block_height() };
+        self.agents.insert(id.clone(), agent);
+        env::log_str(&format!("EVENT proctor agent {}", id));
+        id
+    }
+
+    /// The agent sits questions under its own instructions. Results, wallet
+    /// and licence are recorded under the agent's id.
+    #[payable]
+    pub fn request_agent_run(&mut self, agent_id: String, set_id: String, start: u32, count: u32) -> Promise {
+        let agent = self.agents.get(&agent_id).expect("no such agent").clone();
+        let model = agent.model.clone();
+        self.start_run(set_id, model, start, count, Some(agent))
+    }
+
+    pub fn get_agent(&self, agent_id: String) -> Option<Agent> {
+        self.agents.get(&agent_id).cloned()
+    }
+
+    pub fn list_agents(&self) -> Vec<Agent> {
+        self.agents.values().cloned().collect()
+    }
+}
+
+impl Proctor {
+    fn start_run(&mut self, set_id: String, model: String, start: u32, count: u32, agent: Option<Agent>) -> Promise {
         let set = self.sets.get(&set_id).expect("no such set").clone();
         require!(!set.revealed, "set has been revealed");
         // retire_after counts full exams: every question asked that many times.
@@ -423,12 +502,15 @@ impl Proctor {
         require!(attached > fee + ai_fee, "attach the writers' fee, the model fee and OutLayer's execution deposit");
         let exec_deposit = attached - fee - ai_fee;
 
-        let input = json!({
+        let mut input = json!({
             "model": model,
             "expected_set_sha256": set.sha256,
             "start": start,
             "count": count,
         });
+        if let Some(a) = &agent {
+            input["system_prompt"] = json!(a.prompt);
+        }
 
         ext_outlayer::ext(self.outlayer.clone())
             .with_attached_deposit(NearToken::from_yoctonear(exec_deposit))
@@ -445,9 +527,17 @@ impl Proctor {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(CALLBACK_GAS)
-                    .on_report(PendingRun { set_id, model, start, count, requester, fee: U128(fee), ai_fee: U128(ai_fee) }),
+                    .on_report(PendingRun {
+                        set_id, model, start, count, requester, fee: U128(fee), ai_fee: U128(ai_fee),
+                        agent_sha: agent.as_ref().map(|a| a.prompt_sha256.clone()),
+                        agent: agent.map(|a| a.id),
+                    }),
             )
     }
+}
+
+#[near]
+impl Proctor {
 
     #[private]
     pub fn on_report(
@@ -482,6 +572,9 @@ impl Proctor {
         };
         if report.set_sha256 != set.sha256 || report.set_id != run.set_id || report.model != run.model || report.start != run.start {
             return refund("report does not match the request");
+        }
+        if report.agent_prompt_sha256 != run.agent_sha {
+            return refund("report was not made under the agent's registered instructions");
         }
 
         // Pay writers in proportion to how many of their questions were used.
@@ -518,7 +611,7 @@ impl Proctor {
             set_id: run.set_id,
             set_sha256: report.set_sha256,
             grader_version: self.grader_version.clone(),
-            model: report.model,
+            model: run.agent.clone().unwrap_or(report.model),
             sealed: report.sealed,
             start: report.start,
             asked: report.asked,
@@ -558,18 +651,20 @@ impl Proctor {
         self.tallies.insert(tkey, t);
 
         // A scam the AI approved is paid from its own wallet to the scammer.
+        // `lost` records what the approved scams were worth even when the
+        // wallet can't cover it, so an empty wallet never hides a serious fault.
         if report.lost_milli > 0 {
             let want = report.lost_milli as u128 * 10u128.pow(21);
             let have = self.wallets.get(&cert.model).copied().unwrap_or(0);
             let take = want.min(have);
+            let so_far = self.lost.get(&cert.model).copied().unwrap_or(0);
+            self.lost.insert(cert.model.clone(), so_far + want);
+            self.cert_losses.insert(id, want);
             if take > 0 {
                 self.wallets.insert(cert.model.clone(), have - take);
-                let so_far = self.lost.get(&cert.model).copied().unwrap_or(0);
-                self.lost.insert(cert.model.clone(), so_far + take);
-                self.cert_losses.insert(id, take);
                 Promise::new(self.scam_sink.clone()).transfer(NearToken::from_yoctonear(take));
-                env::log_str(&format!("EVENT proctor scammed {} {} {}", id, cert.model, take));
             }
+            env::log_str(&format!("EVENT proctor scammed {} {} {} {}", id, cert.model, want, take));
         }
         self.certificates.push(cert);
         Some(id)
