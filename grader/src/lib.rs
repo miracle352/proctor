@@ -240,3 +240,51 @@ mod tests {
         assert_eq!(r.results, "10x");
     }
 }
+
+/// The chat request for one question. Settings are fixed per provider so
+/// that runs are repeatable: temperature 0 where the provider allows it, and
+/// low reasoning effort where the provider has that setting. `plain` drops
+/// both, for a provider that refuses them.
+pub fn request_body(model: &str, system: &str, prompt: &str, max_tokens: u32, plain: bool) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": max_tokens,
+    });
+    if plain {
+        return body;
+    }
+    let provider = model.split('/').next().unwrap_or("");
+    // OpenAI's reasoning models accept only their default temperature.
+    let fixed_temperature = provider == "openai" && (model.contains("gpt-5") || model.contains("gpt-6") || model.contains("/o"));
+    if !fixed_temperature {
+        body["temperature"] = 0.into();
+    }
+    // Anthropic's API has no reasoning_effort field.
+    if provider != "anthropic" {
+        body["reasoning_effort"] = "low".into();
+    }
+    body
+}
+
+#[cfg(test)]
+mod body_tests {
+    use super::request_body;
+    #[test]
+    fn settings_per_provider() {
+        let c = request_body("anthropic/claude-haiku-5-5", "s", "p", 10, false);
+        assert_eq!(c["temperature"], 0);
+        assert!(c.get("reasoning_effort").is_none());
+        let g = request_body("openai/gpt-5-nano", "s", "p", 10, false);
+        assert!(g.get("temperature").is_none());
+        assert_eq!(g["reasoning_effort"], "low");
+        let q = request_body("Qwen/Qwen3.8-27B", "s", "p", 10, false);
+        assert_eq!(q["temperature"], 0);
+        assert_eq!(q["reasoning_effort"], "low");
+        let plain = request_body("Qwen/Qwen3.8-27B", "s", "p", 10, true);
+        assert!(plain.get("temperature").is_none() && plain.get("reasoning_effort").is_none());
+    }
+}

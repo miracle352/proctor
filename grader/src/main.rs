@@ -87,40 +87,42 @@ fn main() {
 #[cfg(target_arch = "wasm32")]
 mod net {
     use super::{API, INSTRUCTION};
-    use serde_json::{json, Value};
+    use serde_json::Value;
     use std::time::Duration;
     use wasi_http_client::Client;
 
     /// All prompts are sent at once; answers come back in the same order.
     pub fn ask_all(api_key: &str, model: &str, prompts: &[&str], max_tokens: u32) -> Vec<Result<(String, String), String>> {
-        let bodies: Vec<Vec<u8>> = prompts
-            .iter()
-            .map(|p| {
-                json!({
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": INSTRUCTION},
-                        {"role": "user", "content": p}
-                    ],
-                    "max_tokens": max_tokens,
-                    "temperature": 0,
-                    // Same setting for every model, so scores are comparable.
-                    "reasoning_effort": "low"
+        let send = |idx: &[usize], plain: bool| {
+            let posts: Vec<crate::conc::Post> = idx
+                .iter()
+                .map(|&i| crate::conc::Post {
+                    authority: "cloud-api.near.ai",
+                    path: "/v1/chat/completions",
+                    bearer: api_key,
+                    body: proctor_grader::request_body(model, INSTRUCTION, prompts[i], max_tokens, plain).to_string().into_bytes(),
                 })
-                .to_string()
-                .into_bytes()
-            })
-            .collect();
-        let posts: Vec<crate::conc::Post> = bodies
-            .into_iter()
-            .map(|body| crate::conc::Post { authority: "cloud-api.near.ai", path: "/v1/chat/completions", bearer: api_key, body })
-            .collect();
-        crate::conc::post_all(&posts, 150)
-            .into_iter()
+                .collect();
+            crate::conc::post_all(&posts, 150)
+        };
+        let all: Vec<usize> = (0..prompts.len()).collect();
+        let mut out: Vec<Result<(u16, Vec<u8>), String>> = send(&all, false);
+        // A provider that refuses one of the tuning settings answers 400.
+        // Ask those questions again with only the model, messages and token limit.
+        let refused: Vec<usize> = all.iter().copied().filter(|&i| matches!(out[i], Ok((400, _)))).collect();
+        if !refused.is_empty() {
+            for (i, r) in refused.iter().zip(send(&refused, true)) {
+                out[*i] = r;
+            }
+        }
+        out.into_iter()
             .map(|r| {
                 let (status, bytes) = r?;
                 if !(200..300).contains(&status) {
-                    return Err(format!("status {status}"));
+                    let why = serde_json::from_slice::<Value>(&bytes).ok()
+                        .and_then(|v| v["error"]["message"].as_str().map(|m| m.chars().take(160).collect::<String>()))
+                        .unwrap_or_default();
+                    return Err(format!("status {status} {why}"));
                 }
                 let v: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
                 let text = v["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();

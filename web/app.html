@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proctor app: test an AI, write questions, check a score</title>
+  <meta name="description" content="Run a sealed exam on an AI model from your NEAR wallet and watch every answer get marked and recorded.">
+  <meta name="theme-color" content="#f3f3f4">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="app">
+  <a class="skip" href="#main">Skip to the app</a>
+  <header class="nav stuck">
+    <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
+    <nav aria-label="App screens">
+      <a href="#test" data-view="test">Test an AI</a>
+      <a href="#write" data-view="write">Write questions</a>
+      <a href="#check" data-view="check">Check a score</a>
+    </nav>
+    <div class="who" id="who"><button class="btn primary small" id="connect" type="button"><span class="dot"></span>Connect wallet</button></div>
+  </header>
+
+  <main id="main" class="app-main">
+    <!-- test an AI -->
+    <section class="view" id="view-test" aria-labelledby="test-h">
+      <div class="view-head">
+        <h1 id="test-h">Test an AI on questions it has never seen</h1>
+        <p class="sub">Pick an AI and a sealed question set. Every answer is marked by code inside secure hardware and written to NEAR, where anyone can check it.</p>
+      </div>
+      <div class="test-grid">
+        <form class="builder" id="builder" autocomplete="off">
+          <fieldset class="step">
+            <legend><span class="n">1</span>Choose an AI</legend>
+            <div class="choices" id="models"><span class="sk block"></span></div>
+          </fieldset>
+          <fieldset class="step">
+            <legend><span class="n">2</span>Choose a question set</legend>
+            <div class="choices" id="sets"><span class="sk block"></span></div>
+            <p class="note" id="exposure-note" hidden></p>
+          </fieldset>
+          <fieldset class="step">
+            <legend><span class="n">3</span>Choose the length</legend>
+            <div class="seg" id="length" role="radiogroup" aria-label="Exam length"></div>
+            <p class="note" id="allowance"></p>
+          </fieldset>
+          <div class="pay">
+            <dl id="cost"></dl>
+            <button class="btn primary big" id="start" type="submit"><span class="dot"></span><span id="start-label">Connect a wallet to start</span></button>
+            <p class="note">You pay in NEAR testnet tokens, which are free. Anything the run doesn't use comes back to your wallet within a minute.</p>
+          </div>
+        </form>
+
+        <aside class="room on-dark" id="room" aria-live="polite">
+          <div class="room-top">
+            <div><p class="room-kicker" id="room-kicker">Exam room</p><h2 id="room-title">Your exam will appear here</h2></div>
+            <div class="room-score" id="room-score" hidden><b id="score">0</b><span id="score-of">of 0 right</span></div>
+          </div>
+          <div class="room-bar" id="room-bar" hidden><i></i></div>
+          <ol class="sheet" id="sheet"></ol>
+          <div class="room-foot" id="room-foot">
+            <p>No wallet yet? You can watch a real exam that's already on the record.</p>
+            <button class="btn ghost small" id="replay" type="button">Watch a recorded exam</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- write questions -->
+    <section class="view" id="view-write" aria-labelledby="write-h" hidden>
+      <div class="view-head">
+        <h1 id="write-h">Write questions and get paid each time they're used</h1>
+        <p class="sub">You know your field better than any public test does. Write questions with one exact answer, seal them, and earn a fee every time an AI sits them.</p>
+      </div>
+      <ol class="write-steps">
+        <li class="card">
+          <h2><span class="n">1</span>Write and seal</h2>
+          <p class="hint">This happens on your computer. Nothing you type leaves this page.</p>
+          <form id="seal-form" autocomplete="off">
+            <div class="row2">
+              <label>Name for this set<input name="set_id" required pattern="[a-z0-9\-]{3,40}" placeholder="tax-law-2026" title="Lower-case letters, digits and dashes"></label>
+              <label>Your NEAR account<input name="author" required placeholder="you.testnet" id="author"></label>
+            </div>
+            <div id="qs"></div>
+            <div class="actions">
+              <button type="button" class="btn ghost" id="add-q">Add a question</button>
+              <button type="submit" class="btn primary"><span class="dot"></span>Build sealed file</button>
+            </div>
+          </form>
+          <div class="out" id="seal-out" hidden></div>
+        </li>
+        <li class="card" id="lock-card">
+          <h2><span class="n">2</span>Lock it inside OutLayer</h2>
+          <p class="hint">OutLayer keeps the file encrypted so that only Proctor's marking program can open it, and only inside secure hardware. Run this once with OutLayer's tool, signed in as the same NEAR account.</p>
+          <pre class="cmd" id="lock-cmd">Build the sealed file first.</pre>
+          <button class="btn ghost small" type="button" id="copy-lock">Copy command</button>
+        </li>
+        <li class="card">
+          <h2><span class="n">3</span>Commit it on NEAR</h2>
+          <p class="hint">The fingerprint goes on the public record before any AI sees a question. Your stake stands behind the answer key: if someone proves an answer wrong after the set is published, they're paid from it.</p>
+          <div class="row3">
+            <label>Fee per question (NEAR)<input id="c-price" inputmode="decimal" value="0.001"></label>
+            <label>Retire after this many exams<input id="c-retire" inputmode="numeric" value="10"></label>
+            <label>Your stake (NEAR)<input id="c-stake" inputmode="decimal" value="0.2"></label>
+          </div>
+          <button class="btn primary" id="commit" type="button"><span class="dot"></span>Commit set</button>
+          <div class="out" id="commit-out" hidden></div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- check a score -->
+    <section class="view" id="view-check" aria-labelledby="check-h" hidden>
+      <div class="view-head">
+        <h1 id="check-h">Check a score for yourself</h1>
+        <p class="sub">Someone shows you a Proctor score. Enter its certificate number and see exactly what was recorded, by which marking program, against which sealed set.</p>
+      </div>
+      <div class="check-grid">
+        <div class="card">
+          <h2>Look up a certificate</h2>
+          <form id="lookup" class="inline">
+            <label class="sr" for="cert-id">Certificate number</label>
+            <input id="cert-id" inputmode="numeric" placeholder="145" required>
+            <button class="btn primary" type="submit"><span class="dot"></span>Look up</button>
+          </form>
+          <div id="cert-out"></div>
+        </div>
+        <div class="card">
+          <h2>Check a published set</h2>
+          <p class="hint">Once a set retires, its questions are published. Paste the file to confirm it is exactly what was fingerprinted before any AI saw it.</p>
+          <textarea id="verify-in" rows="7" spellcheck="false" placeholder='{"set_id":"…","items":[…]}' aria-label="Published set file"></textarea>
+          <button class="btn ghost" id="verify-btn" type="button">Check fingerprint</button>
+          <div class="out" id="verify-out" hidden></div>
+        </div>
+        <div class="card wide" id="mine-card" hidden>
+          <h2>Your exams</h2>
+          <div id="mine"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>

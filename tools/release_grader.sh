@@ -31,7 +31,7 @@ for profile in "$@"; do
   outlayer secrets access --profile "$profile" --build "$new" >/dev/null && echo "moved $profile"
 done
 
-near contract call-function as-transaction "$CONTRACT" set_grader_version json-args "{\"grader_version\":\"$new\"}" \
+near contract call-function as-transaction "$CONTRACT" set_grader_version json-args "{\"grader_version\":\"$new\",\"same_marking\":${SAME_MARKING:-false}}" \
   prepaid-gas '30 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT" network-config testnet sign-with-legacy-keychain send >/dev/null
 outlayer versions remove "$old" >/dev/null && echo "removed $old"
 echo "$new"

@@ -10,12 +10,13 @@
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json::{self, json, Value};
-use near_sdk::store::{IterableMap, Vector};
+use near_sdk::store::{IterableMap, LookupMap, Vector};
 use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseError};
 
 const CALLBACK_GAS: Gas = Gas::from_tgas(30);
 const MAX_SLICE: u32 = 10;
 const MIN_BOND: NearToken = NearToken::from_millinear(100);
+const DAY_NS: u64 = 86_400_000_000_000;
 
 #[ext_contract(ext_outlayer)]
 #[allow(dead_code)]
@@ -140,6 +141,26 @@ pub struct PendingRun {
     pub count: u32,
     pub requester: AccountId,
     pub fee: U128,
+    /// Covers the model's cost for paid models run by the public. Kept by the
+    /// owner, who pays NEAR AI Cloud. Refunded if the run fails.
+    #[serde(default)]
+    pub ai_fee: U128,
+}
+
+/// Usage in one UTC day: (day number, questions asked).
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Default)]
+pub struct DayCount {
+    pub day: u64,
+    pub asked: u32,
+}
+
+/// A model anyone may run. `ai_fee` is charged per question on top of the
+/// writers' fee, to cover what the model costs on NEAR AI Cloud.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct PublicModel {
+    pub ai_fee: U128,
 }
 
 #[near(contract_state)]
@@ -149,6 +170,29 @@ pub struct Proctor {
     outlayer: AccountId,
     grader_project: String,
     /// sha256 of the grader wasm every run is pinned to.
+    grader_version: String,
+    sets: IterableMap<String, SetInfo>,
+    certificates: Vector<Certificate>,
+    challenges: Vector<Challenge>,
+    /// Builds whose marking matches the current one, so their certificates
+    /// still count toward scores. Always includes grader_version.
+    comparable: Vec<String>,
+    /// Accounts the owner runs exams from. No model list, no daily cap.
+    trusted: Vec<AccountId>,
+    public_models: IterableMap<String, PublicModel>,
+    /// Questions one account may ask per day, and all public accounts together.
+    cap_per_account: u32,
+    cap_total: u32,
+    usage: LookupMap<AccountId, DayCount>,
+    usage_total: DayCount,
+}
+
+/// Layout before public runs existed, read once by `migrate`.
+#[near(serializers = [borsh])]
+struct ProctorV1 {
+    owner: AccountId,
+    outlayer: AccountId,
+    grader_project: String,
     grader_version: String,
     sets: IterableMap<String, SetInfo>,
     certificates: Vector<Certificate>,
@@ -163,17 +207,80 @@ impl Proctor {
             owner: env::predecessor_account_id(),
             outlayer,
             grader_project,
+            comparable: vec![grader_version.clone()],
             grader_version,
             sets: IterableMap::new(b"s"),
             certificates: Vector::new(b"c"),
             challenges: Vector::new(b"h"),
+            trusted: vec![],
+            public_models: IterableMap::new(b"m"),
+            cap_per_account: 20,
+            cap_total: 300,
+            usage: LookupMap::new(b"u"),
+            usage_total: DayCount::default(),
         }
+    }
+
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let old: ProctorV1 = env::state_read().expect("no state to migrate");
+        Self {
+            comparable: vec![old.grader_version.clone()],
+            owner: old.owner,
+            outlayer: old.outlayer,
+            grader_project: old.grader_project,
+            grader_version: old.grader_version,
+            sets: old.sets,
+            certificates: old.certificates,
+            challenges: old.challenges,
+            trusted: vec![],
+            public_models: IterableMap::new(b"m"),
+            cap_per_account: 20,
+            cap_total: 300,
+            usage: LookupMap::new(b"u"),
+            usage_total: DayCount::default(),
+        }
+    }
+
+    fn only_owner(&self) {
+        require!(env::predecessor_account_id() == self.owner, "owner only");
+    }
+
+    /// Open a model to the public, or change its fee. `ai_fee` is per question.
+    pub fn set_public_model(&mut self, model: String, ai_fee: U128) {
+        self.only_owner();
+        self.public_models.insert(model, PublicModel { ai_fee });
+    }
+
+    pub fn remove_public_model(&mut self, model: String) {
+        self.only_owner();
+        self.public_models.remove(&model);
+    }
+
+    pub fn set_caps(&mut self, per_account: u32, total: u32) {
+        self.only_owner();
+        self.cap_per_account = per_account;
+        self.cap_total = total;
+    }
+
+    pub fn set_trusted(&mut self, accounts: Vec<AccountId>) {
+        self.only_owner();
+        self.trusted = accounts;
     }
 
     /// A new grader build is a new version; old certificates keep the
     /// version they were made with.
-    pub fn set_grader_version(&mut self, grader_version: String) {
-        require!(env::predecessor_account_id() == self.owner, "owner only");
+    /// `same_marking` says the new build marks answers exactly as the old
+    /// one did, so earlier certificates keep counting toward scores.
+    pub fn set_grader_version(&mut self, grader_version: String, same_marking: Option<bool>) {
+        self.only_owner();
+        if !same_marking.unwrap_or(false) {
+            self.comparable.clear();
+        }
+        if !self.comparable.contains(&grader_version) {
+            self.comparable.push(grader_version.clone());
+        }
         self.grader_version = grader_version;
     }
 
@@ -217,15 +324,23 @@ impl Proctor {
     pub fn request_run(&mut self, set_id: String, model: String, start: u32, count: u32) -> Promise {
         let set = self.sets.get(&set_id).expect("no such set").clone();
         require!(!set.revealed, "set has been revealed");
-        require!(set.runs < set.retire_after, "set is retired");
+        // retire_after counts full exams: every question asked that many times.
+        require!(set.runs + count <= set.retire_after * set.size, "set is retired");
         require!(count > 0 && count <= MAX_SLICE, "count must be 1..=10");
         require!(start + count <= set.size, "slice is past the end of the set");
 
+        let requester = env::predecessor_account_id();
+        let ai_fee = if requester == self.owner || self.trusted.contains(&requester) {
+            0
+        } else {
+            let per = self.public_models.get(&model).expect("this model isn't open to the public yet").ai_fee.0;
+            self.count_usage(&requester, count);
+            per * count as u128
+        };
         let fee = set.price_per_question.0 * count as u128;
         let attached = env::attached_deposit().as_yoctonear();
-        require!(attached > fee, "attach the writers' fee plus OutLayer's execution deposit");
-        let exec_deposit = attached - fee;
-        let requester = env::predecessor_account_id();
+        require!(attached > fee + ai_fee, "attach the writers' fee, the model fee and OutLayer's execution deposit");
+        let exec_deposit = attached - fee - ai_fee;
 
         let input = json!({
             "model": model,
@@ -249,7 +364,7 @@ impl Proctor {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(CALLBACK_GAS)
-                    .on_report(PendingRun { set_id, model, start, count, requester, fee: U128(fee) }),
+                    .on_report(PendingRun { set_id, model, start, count, requester, fee: U128(fee), ai_fee: U128(ai_fee) }),
             )
     }
 
@@ -261,8 +376,8 @@ impl Proctor {
     ) -> Option<u64> {
         let refund = |why: &str| {
             env::log_str(&format!("EVENT proctor run_failed {} {}", run.set_id, why));
-            if run.fee.0 > 0 {
-                Promise::new(run.requester.clone()).transfer(NearToken::from_yoctonear(run.fee.0));
+            if run.fee.0 + run.ai_fee.0 > 0 {
+                Promise::new(run.requester.clone()).transfer(NearToken::from_yoctonear(run.fee.0 + run.ai_fee.0));
             }
             None
         };
@@ -434,8 +549,43 @@ impl Proctor {
             "outlayer": self.outlayer,
             "grader_project": self.grader_project,
             "grader_version": self.grader_version,
+            "comparable": self.comparable,
             "certificates": self.certificates.len(),
+            "cap_per_account": self.cap_per_account,
+            "cap_total": self.cap_total,
         })
+    }
+
+    pub fn list_public_models(&self) -> Vec<(String, PublicModel)> {
+        self.public_models.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+
+    /// Questions this account can still ask today, and all public accounts together.
+    pub fn allowance(&self, account_id: AccountId) -> Value {
+        let today = env::block_timestamp() / DAY_NS;
+        let mine = self.usage.get(&account_id).filter(|d| d.day == today).map(|d| d.asked).unwrap_or(0);
+        let all = if self.usage_total.day == today { self.usage_total.asked } else { 0 };
+        let unlimited = account_id == self.owner || self.trusted.contains(&account_id);
+        json!({
+            "unlimited": unlimited,
+            "account_left": self.cap_per_account.saturating_sub(mine),
+            "total_left": self.cap_total.saturating_sub(all),
+        })
+    }
+}
+
+impl Proctor {
+    fn count_usage(&mut self, who: &AccountId, count: u32) {
+        let today = env::block_timestamp() / DAY_NS;
+        let mut mine = self.usage.get(who).copied().filter(|d| d.day == today).unwrap_or(DayCount { day: today, asked: 0 });
+        if self.usage_total.day != today {
+            self.usage_total = DayCount { day: today, asked: 0 };
+        }
+        require!(mine.asked + count <= self.cap_per_account, "this account has used today's questions; try again tomorrow");
+        require!(self.usage_total.asked + count <= self.cap_total, "the site has used today's questions; try again tomorrow");
+        mine.asked += count;
+        self.usage_total.asked += count;
+        self.usage.insert(who.clone(), mine);
     }
 }
 
@@ -463,6 +613,35 @@ mod tests {
             U128(1_000),
             5,
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "isn't open to the public")]
+    fn public_cannot_run_unlisted_model() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(3)).attached_deposit(NearToken::from_near(1)).build());
+        p.request_run("set-1".into(), "anthropic/claude-opus-5-5".into(), 0, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "used today's questions")]
+    fn daily_cap_per_account() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        p.set_caps(1, 100);
+        let who: AccountId = accounts(3);
+        p.count_usage(&who, 1);
+        p.count_usage(&who, 1);
+    }
+
+    #[test]
+    fn grader_upgrade_keeps_scores_when_marking_is_unchanged() {
+        let mut p = setup();
+        p.set_grader_version("cd".repeat(32), Some(true));
+        assert_eq!(p.comparable.len(), 2);
+        p.set_grader_version("ef".repeat(32), None);
+        assert_eq!(p.comparable, vec!["ef".repeat(32)]);
     }
 
     #[test]

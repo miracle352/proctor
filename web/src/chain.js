@@ -1,27 +1,49 @@
-// Everything on the page is read straight from the contract on NEAR testnet.
-// There is no server and no cached copy.
+// Reads come straight from the contract on NEAR testnet. No server, no cache.
 
 export const CONTRACT = "app.proctor-91796.testnet";
-const RPC = "https://rpc.testnet.fastnear.com";
+export const NETWORK = "testnet";
+export const RPC = "https://rpc.testnet.fastnear.com";
+export const EXPLORER = "https://testnet.nearblocks.io";
+export const YOCTO = 10n ** 24n;
 
-async function view(method, args = {}) {
+async function rpc(method, params) {
   const res = await fetch(RPC, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0", id: 1, method: "query",
-      params: {
-        request_type: "call_function", finality: "final", account_id: CONTRACT,
-        method_name: method, args_base64: btoa(JSON.stringify(args)),
-      },
-    }),
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
   const j = await res.json();
-  if (j.error || j.result?.error) throw new Error(j.error?.message || j.result.error);
-  return JSON.parse(new TextDecoder().decode(new Uint8Array(j.result.result)));
+  if (j.error) throw new Error(j.error.data || j.error.message || "RPC error");
+  return j.result;
 }
 
-async function paged(method, page = 50) {
+export async function view(method, args = {}, account = CONTRACT) {
+  const r = await rpc("query", {
+    request_type: "call_function", finality: "final", account_id: account,
+    method_name: method, args_base64: btoa(JSON.stringify(args)),
+  });
+  if (r.error) throw new Error(r.error);
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(r.result)));
+}
+
+export async function balance(account) {
+  const r = await rpc("query", { request_type: "view_account", finality: "final", account_id: account });
+  return BigInt(r.amount);
+}
+
+// Logs of a transaction so far. Proctor writes "EVENT proctor certificate ID ..."
+// or "EVENT proctor run_failed SET WHY" once the grader has answered.
+export async function txEvents(hash, sender) {
+  try {
+    const r = await rpc("EXPERIMENTAL_tx_status", { tx_hash: hash, sender_account_id: sender, wait_until: "NONE" });
+    const logs = (r.receipts_outcome || []).flatMap((o) => o.outcome.logs);
+    return logs.filter((l) => l.startsWith("EVENT proctor"));
+  } catch {
+    return null;
+  }
+}
+
+async function paged(method, page = 100) {
   const out = [];
   for (let from = 0; ; from += page) {
     const batch = await view(method, { from, limit: page });
@@ -29,6 +51,26 @@ async function paged(method, page = 50) {
     if (batch.length < page) return out;
   }
 }
+
+export const MODELS = {
+  "Qwen/Qwen3.8-27B": { name: "Qwen 3.8", maker: "Alibaba Qwen" },
+  "anthropic/claude-haiku-5-5": { name: "Claude Haiku 5.5", maker: "Anthropic" },
+  "openai/gpt-5-nano": { name: "GPT-5 nano", maker: "OpenAI" },
+  "google/gemini-3.1-flash-lite": { name: "Gemini 3.1 Flash-Lite", maker: "Google" },
+  "deepseek/deepseek-v4.1-flash": { name: "DeepSeek V4.1 Flash", maker: "DeepSeek" },
+};
+export const modelName = (m) => MODELS[m]?.name || m.split("/").pop();
+export const makerName = (m) => MODELS[m]?.maker || m.split("/")[0].replace(/^./, (c) => c.toUpperCase());
+
+export function setLabel(id) {
+  const part = id.split("-").pop().toUpperCase();
+  if (id.includes("-original-")) return `Published school maths, part ${part}`;
+  if (id.includes("-twin-")) return `Rewritten school maths, part ${part}`;
+  if (id === "spike-1") return "Pilot set";
+  return id;
+}
+export const isTwin = (id) => id.includes("-twin-");
+export const isOriginal = (id) => id.includes("-original-");
 
 function mulberry(seed) {
   return () => {
@@ -39,7 +81,7 @@ function mulberry(seed) {
   };
 }
 
-// original-minus-twin score per paired question, with a bootstrap 90% interval
+// published-minus-rewritten score per paired question, with a bootstrap 90% interval
 function gap(orig, twin) {
   const keys = Object.keys(orig).filter((k) => k in twin);
   if (keys.length < 5) return null;
@@ -56,23 +98,25 @@ function gap(orig, twin) {
 }
 
 export async function load() {
-  const [config, setList, every] = await Promise.all([
+  const [config, setList, every, pub] = await Promise.all([
     view("config"),
     view("list_sets", { from: 0, limit: 200 }),
     paged("get_certificates"),
+    view("list_public_models").catch(() => []),
   ]);
   const sets = Object.fromEntries(setList);
-  // Only the grader build the contract points at now counts toward scores.
-  const certs = every.filter((c) => c.grader_version === config.grader_version);
+  const comparable = config.comparable || [config.grader_version];
+  // Only builds that mark answers the way the current one does count toward scores.
+  const certs = every.filter((c) => comparable.includes(c.grader_version));
 
-  const grid = {}; // model -> set -> index -> 0/1
+  const grid = {}; // model -> set -> question index -> 0/1
   const sealedBy = {};
   for (const c of certs) {
     const faulty = sets[c.set_id]?.faulty || [];
     const g = ((grid[c.model] ||= {})[c.set_id] ||= {});
     [...c.results].forEach((ch, i) => {
       const idx = c.start + i;
-      if ((ch === "0" || ch === "1") && !faulty.includes(idx)) g[idx] = +ch;
+      if ((ch === "0" || ch === "1") && !faulty.includes(idx) && !(idx in g)) g[idx] = +ch;
     });
     sealedBy[c.model] = c.sealed;
   }
@@ -84,25 +128,63 @@ export async function load() {
     }).sort((a, b) => a.set_id.localeCompare(b.set_id));
     const fam = { o: {}, t: {} };
     for (const [sid, r] of Object.entries(bySet)) {
-      const side = sid.includes("-original-") ? "o" : sid.includes("-twin-") ? "t" : null;
+      const side = isOriginal(sid) ? "o" : isTwin(sid) ? "t" : null;
       if (!side) continue;
       const part = sid.split("-").pop();
       for (const [i, v] of Object.entries(r)) fam[side][part + i] = v;
     }
-    const twins = Object.values(fam.t);
+    const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+    const n = (o) => Object.keys(o).length;
     return {
       model, sealed: sealedBy[model], perSet,
       asked: perSet.reduce((a, s) => a + s.asked, 0),
       correct: perSet.reduce((a, s) => a + s.correct, 0),
-      twinScore: twins.length ? twins.reduce((a, b) => a + b, 0) / twins.length : null,
-      twinN: twins.length,
+      pub: n(fam.o) ? sum(fam.o) / n(fam.o) : null, pubN: n(fam.o),
+      fresh: n(fam.t) ? sum(fam.t) / n(fam.t) : null, freshN: n(fam.t),
       gap: gap(fam.o, fam.t),
     };
-  }).sort((a, b) => (b.twinN - a.twinN) || (b.correct / b.asked - a.correct / a.asked));
+  }).sort((a, b) => (b.freshN - a.freshN) || ((b.fresh ?? 0) - (a.fresh ?? 0)) || (b.correct / b.asked - a.correct / a.asked));
 
-  const paid = certs.reduce((a, c) => a + Number(BigInt(c.paid_to_authors) / 10n ** 18n), 0) / 1e6;
-  return { config, sets, certs: certs.slice().reverse(), older: every.length - certs.length, models, paid };
+  const paid = certs.reduce((a, c) => a + BigInt(c.paid_to_authors), 0n);
+  return {
+    config, sets, every, certs, models, paid,
+    publicModels: Object.fromEntries(pub),
+    newest: every.slice().sort((a, b) => b.block_height - a.block_height),
+  };
 }
 
-export const short = (h, n = 6) => (h.length > 2 * n + 1 ? `${h.slice(0, n)}…${h.slice(-n)}` : h);
-export const near = (yocto) => (Number(BigInt(yocto) / 10n ** 18n) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 3 });
+export const short = (h, n = 6) => (h && h.length > 2 * n + 1 ? `${h.slice(0, n)}…${h.slice(-n)}` : h);
+export const near = (yocto, digits = 3) => (Number(BigInt(yocto) / 10n ** 18n) / 1e6).toLocaleString(undefined, { maximumFractionDigits: digits });
+export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+export const $ = (s, el = document) => el.querySelector(s);
+export const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+export const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+export const wait = (ms) => new Promise((r) => setTimeout(r, still ? 0 : ms));
+
+export const LOGO = `<svg viewBox="0 0 40 28" aria-hidden="true" class="logo-mark"><rect x="1.5" y="1.5" width="37" height="25" rx="12.5" fill="none" stroke="currentColor" stroke-width="2.6"/><rect class="logo-fill" x="7" y="7" width="26" height="14" rx="7" fill="currentColor"/><path class="logo-scribble" d="M10 15.5c3-3 5 1.5 8-1.5s5 2 8-.5 4 1.5 5 0" fill="none" stroke="#3ddc5a" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
+export const ICON = {
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l5 5.5 9-11"/></svg>',
+  wrong: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  none: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>',
+};
+
+export const sha256 = async (text) =>
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+// Counts up from 0 when the element first scrolls into view.
+export function countUp(el, to, { decimals = 0, suffix = "", ms = 1100 } = {}) {
+  const fmt = (v) => v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix;
+  if (still) { el.textContent = fmt(to); return; }
+  const go = () => {
+    const t0 = performance.now();
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = fmt(to * e);
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); go(); } }, { threshold: 0.4 });
+  io.observe(el);
+}
