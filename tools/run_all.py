@@ -26,11 +26,12 @@ HERE = Path(__file__).parent
 
 
 def done_indexes(model, set_id):
+    current = view(CONTRACT, "config", {})["grader_version"]
     start, done = 0, set()
     while True:
         batch = view(CONTRACT, "get_certificates", {"from": start, "limit": 50})
         for c in batch:
-            if c["model"] == model and c["set_id"] == set_id:
+            if c["model"] == model and c["set_id"] == set_id and c["grader_version"] == current:
                 for i, ch in enumerate(c["results"]):
                     if ch in "01":
                         done.add(c["start"] + i)

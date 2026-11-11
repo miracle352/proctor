@@ -62,14 +62,45 @@ fn normalise_text(s: &str) -> String {
         .join(" ")
 }
 
-/// Parse "1,250", "$1250.00", "12.5%", "-3" etc. Returns None for anything
-/// that still is not a single number after cleanup.
+/// The first number on the answer line. Models add units and currency
+/// ("45 minutes", "$1,250.00", "1,600 lbs"), so we read the leading number
+/// and ignore what follows. Thousands separators are dropped; "3/4" is read
+/// as a fraction.
 pub fn parse_number(s: &str) -> Option<f64> {
-    let cleaned: String = s
-        .chars()
-        .filter(|c| !matches!(c, ',' | '$' | '%' | ' ' | '€' | '£' | '₦'))
-        .collect();
-    cleaned.parse::<f64>().ok()
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() && !chars[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i == chars.len() {
+        return None;
+    }
+    let negative = i > 0 && chars[i - 1] == '-';
+    let mut num = String::new();
+    let mut j = i;
+    while j < chars.len() {
+        let c = chars[j];
+        if c.is_ascii_digit() {
+            num.push(c);
+        } else if c == ',' && j + 3 < chars.len() + 1 && chars.get(j + 1).map_or(false, |d| d.is_ascii_digit()) {
+            // thousands separator: skip it
+        } else if c == '.' && chars.get(j + 1).map_or(false, |d| d.is_ascii_digit()) && !num.contains('.') {
+            num.push('.');
+        } else {
+            break;
+        }
+        j += 1;
+    }
+    let mut value: f64 = num.parse().ok()?;
+    if chars.get(j) == Some(&'/') {
+        let den: String = chars[j + 1..].iter().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(d) = den.parse::<f64>() {
+            if d != 0.0 {
+                value /= d;
+            }
+        }
+    }
+    Some(if negative { -value } else { value })
 }
 
 pub fn is_correct(answer: &Answer, response: &str) -> bool {
@@ -171,7 +202,11 @@ mod tests {
         assert_eq!(parse_number("$1,250.00"), Some(1250.0));
         assert_eq!(parse_number("12.5%"), Some(12.5));
         assert_eq!(parse_number("₦ 3,000"), Some(3000.0));
-        assert_eq!(parse_number("about 3"), None);
+        assert_eq!(parse_number("45 minutes"), Some(45.0));
+        assert_eq!(parse_number("**1,600 lbs**"), Some(1600.0));
+        assert_eq!(parse_number("-3 degrees"), Some(-3.0));
+        assert_eq!(parse_number("3/4 of a cup"), Some(0.75));
+        assert_eq!(parse_number("no idea"), None);
     }
 
     #[test]
@@ -181,6 +216,7 @@ mod tests {
         assert!(!is_correct(&a, "ANSWER: 0.34"));
         let exact = Answer::Number { value: 7.0, tol: 0.0 };
         assert!(is_correct(&exact, "ANSWER: 7"));
+        assert!(is_correct(&exact, "ANSWER: 7 apples"));
         assert!(!is_correct(&exact, "the answer is 7"));
     }
 

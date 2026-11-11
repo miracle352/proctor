@@ -78,11 +78,16 @@ def gap(orig, twin, reps=5000, seed=1):
 
 def main(contract):
     sets = {sid: info for sid, info in view(contract, "list_sets", {"from": 0, "limit": 200})}
-    certs = paged(contract, "get_certificates")
+    current = view(contract, "config", {})["grader_version"]
+    every = paged(contract, "get_certificates")
+    # Only the grader the contract points at now counts. Older versions stay
+    # on chain with their version recorded, so the history is still there.
+    certs = [c for c in every if c["grader_version"] == current]
     faulty = {sid: set(info["faulty"]) for sid, info in sets.items()}
     grid = per_question(certs, faulty)
 
-    print(f"{len(certs)} certificates over {len(sets)} sets\n")
+    print(f"grader {current[:12]}: {len(certs)} certificates over {len(sets)} sets "
+          f"({len(every) - len(certs)} from older grader versions not counted)\n")
     print("SCORES (faulty questions dropped)")
     for (model, sid), res in sorted(grid.items()):
         n, k = len(res), sum(res.values())
