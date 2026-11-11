@@ -20,6 +20,12 @@ const toast = (msg, bad) => {
   const t = $("#toast"); t.textContent = msg; t.className = `toast${bad ? " bad" : ""}`; t.hidden = false;
   clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 5000);
 };
+// "Smart contract panicked: you already have…" -> "You already have…"
+const plain = (err) => {
+  const m = String(err?.message || err).match(/panicked: ([^"\\}]+)/);
+  const t = m ? m[1] : String(err?.message || err);
+  return t.charAt(0).toUpperCase() + t.slice(1).replace(/\.?$/, ".");
+};
 const yocto = (nearStr) => {
   const [w, f = ""] = String(nearStr).trim().split(".");
   if (!/^\d+$/.test(w || "0") || !/^\d*$/.test(f)) return null;
@@ -173,7 +179,7 @@ $("#builder").addEventListener("submit", async (e) => {
     exam.hashes = hashes; saveExam(exam);
     watch(exam);
   } catch (err) {
-    toast(`The wallet didn't send the exam: ${err.message || err}`, true);
+    toast(`The exam wasn't sent. ${plain(err)}`, true);
     closeRoom();
   } finally { btn.removeAttribute("aria-busy"); }
 });
@@ -315,12 +321,22 @@ $("#agent-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!me) return connect();
   const f = new FormData(e.target), out = $("#agent-out");
+  const name = f.get("name").trim();
+  if (await view("get_agent", { agent_id: `agent:${me}/${name}` }).catch(() => null)) {
+    out.hidden = false; out.className = "out bad";
+    out.innerHTML = `<strong>You already have an agent called ${esc(name)}</strong><span>It's in step 2. Pick another name, or remove that agent first.</span>`;
+    return;
+  }
   try {
     await send([["register_agent", { name: f.get("name").trim(), model: f.get("model"), prompt: f.get("prompt").trim() }, 5n * 10n ** 22n, "30000000000000"]], `${location.origin}${location.pathname}#agent`);
     out.hidden = false; out.className = "out ok";
     out.innerHTML = `<strong>Registered</strong><span>agent:${esc(me)}/${esc(f.get("name").trim())} is on NEAR. Sit its licence exam next.</span>`;
     await renderMyAgents();
-  } catch (err) { out.hidden = false; out.className = "out bad"; out.innerHTML = `<strong>Not registered</strong><span>${esc(err.message || err)}</span>`; }
+  } catch (err) {
+    // a browser wallet can report a failure after the transaction went through
+    await renderMyAgents();
+    out.hidden = false; out.className = "out bad"; out.innerHTML = `<strong>Not registered</strong><span>${esc(plain(err))}</span>`;
+  }
 });
 const MONEY_SETS = () => Object.entries(D.sets).filter(([id, s]) => id.startsWith("money-") && !s.revealed).sort(([a], [b]) => a.localeCompare(b));
 async function renderMyAgents() {
@@ -338,11 +354,19 @@ async function renderMyAgents() {
       <div class="ac-top"><div><b>${esc(a.name)}</b><small>${esc(modelName(a.model))}, registered in block ${a.block_height.toLocaleString()}</small></div>${status}</div>
       ${l ? `<p class="note">${esc(l.reason[0].toUpperCase() + l.reason.slice(1))}. ${l.asked} of 42 answered, ${l.percent}% right${BigInt(l.lost) > 0n ? `, scams worth ${near(l.lost)} NEAR approved` : ""}.</p>` : ""}
       <button class="btn primary" type="button" data-sit="${esc(a.id)}"><span class="dot"></span>Sit the licence exam: 6 transactions, about ${near(total, 2)} NEAR</button>
-      <p class="note">Includes 0.3 NEAR for your agent's own wallet, so the scams it approves really cost it. About three minutes.</p>
+      <p class="note">Includes 0.3 NEAR for your agent's own wallet, so the scams it approves really cost it. About three minutes. <button class="link danger" type="button" data-remove="${esc(a.id)}">Remove this agent</button></p>
     </article>`;
   }).join("");
 }
 $("#my-agents").addEventListener("click", async (e) => {
+  const rm = e.target.closest("[data-remove]");
+  if (rm) {
+    if (!confirm("Remove this agent? Its instructions stay in NEAR's transaction history, but it disappears from Proctor and can't sit exams.")) return;
+    try { await send([["remove_agent", { agent_id: rm.dataset.remove }, 0n, "30000000000000"]], `${location.origin}${location.pathname}#agent`); toast("Agent removed"); }
+    catch (err) { toast(plain(err), true); }
+    await renderMyAgents();
+    return;
+  }
   const b = e.target.closest("[data-sit]");
   if (!b) return;
   const id = b.dataset.sit, agent = await view("get_agent", { agent_id: id });
@@ -355,7 +379,7 @@ $("#my-agents").addEventListener("click", async (e) => {
     await send(calls, `${location.origin}${location.pathname}#agent`);
     b.textContent = "Exam sent. Marks arrive over the next few minutes";
     for (let i = 0; i < 60; i++) { await wait(10000); await renderMyAgents(); }
-  } catch (err) { toast(`The wallet didn't send the exam: ${err.message || err}`, true); b.removeAttribute("aria-busy"); }
+  } catch (err) { toast(`The exam wasn't sent. ${plain(err)}`, true); b.removeAttribute("aria-busy"); }
 });
 
 /* write questions */

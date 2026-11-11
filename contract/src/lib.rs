@@ -471,6 +471,14 @@ impl Proctor {
         self.start_run(set_id, model, start, count, Some(agent))
     }
 
+    /// The agent's owner can take it down. Its past certificates stay.
+    pub fn remove_agent(&mut self, agent_id: String) {
+        let agent = self.agents.get(&agent_id).expect("no such agent").clone();
+        require!(env::predecessor_account_id() == agent.owner, "only the agent's owner can remove it");
+        self.agents.remove(&agent_id);
+        env::log_str(&format!("EVENT proctor agent_removed {}", agent_id));
+    }
+
     pub fn get_agent(&self, agent_id: String) -> Option<Agent> {
         self.agents.get(&agent_id).cloned()
     }
