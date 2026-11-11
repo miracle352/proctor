@@ -152,7 +152,7 @@ function flyCoins(fromEl, n) {
   }
 }
 function renderWallets() {
-  const ws = D.wallets.filter((w) => BigInt(w.balance) + BigInt(w.lost) > 0n);
+  const ws = D.wallets.filter((w) => !w.model.startsWith("agent:") && BigInt(w.balance) + BigInt(w.lost) > 0n);
   if (!ws.length) { $("#wt-feed").textContent = "The wallet test hasn't started yet."; return; }
   const byModel = Object.fromEntries(D.models.map((m) => [m.model, m]));
   const asked = ws.reduce((a, w) => a + (byModel[w.model]?.moneyN || 0), 0);
@@ -194,9 +194,31 @@ function renderWallets() {
   show(); if (!still) setInterval(show, 4200);
 }
 
+/* agents: same model, different instructions */
+async function renderAgents() {
+  const { view } = await import("./chain.js");
+  const agents = (await view("list_agents").catch(() => [])).filter((a) => a.owner === "builder.proctor-91796.testnet");
+  if (!agents.length) { $("#agents").hidden = true; return; }
+  const rows = await Promise.all(agents.map(async (a) => [a, await view("licence", { model: a.id, skill: "money" }).catch(() => null)]));
+  rows.sort(([a], [b]) => a.name.localeCompare(b.name));
+  $("#agent-pair").innerHTML = rows.map(([a, l], i) => {
+    const w = D.wallets.find((x) => x.model === a.id);
+    const lost = l ? nearNum(l.lost) : 0, scams = Math.round(lost / 0.05);
+    const yes = l?.licensed, done = l && l.asked >= l.min_questions;
+    return `<article class="lcard agent" style="--i:${i}">
+      <p class="maker">agent:${esc(a.owner)}/<b>${esc(a.name)}</b> on ${esc(modelName(a.model))}</p>
+      <span class="stamp ${yes ? "yes" : ""}">${yes ? "LICENSED" : done ? "NOT LICENSED" : "EXAM IN PROGRESS"}</span>
+      <blockquote>${esc(a.prompt.length > 260 ? a.prompt.slice(0, 260) + "…" : a.prompt)}</blockquote>
+      <div class="nums"><span><b>${l?.asked ? l.percent + "%" : "–"}</b>right</span><span><b>${scams}</b>scam${scams === 1 ? "" : "s"} paid</span><span><b>${w ? nearNum(w.balance).toFixed(2) : "–"}</b>NEAR left</span></div>
+      <p class="why">${l ? esc(l.reason[0].toUpperCase() + l.reason.slice(1)) + "." : ""}</p>
+    </article>`;
+  }).join("");
+  $$("#agent-pair .lcard").forEach((el) => reveal.observe(el));
+}
+
 /* licences and the vault */
 function renderLicences() {
-  const ws = D.wallets.filter((w) => BigInt(w.balance) + BigInt(w.lost) > 0n);
+  const ws = D.wallets.filter((w) => !w.model.startsWith("agent:") && BigInt(w.balance) + BigInt(w.lost) > 0n);
   $("#lic-grid").innerHTML = ws.map((w, i) => {
     const l = D.licences[w.model] || {};
     const yes = !!l.licensed;
@@ -365,6 +387,6 @@ function renderStats() {
     $("#board").innerHTML = `<p class="fail">Couldn't read the contract (${esc(err.message)}). Reload to try again.</p>`;
     return;
   }
-  renderStats(); renderTicker(); renderBoard(); fillStageData(); renderWallets(); renderLicences();
+  renderStats(); renderTicker(); renderBoard(); fillStageData(); renderWallets(); renderLicences(); renderAgents();
   windowLoop();
 })();
