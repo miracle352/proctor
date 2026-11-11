@@ -1,0 +1,7 @@
+{
+  "display": { "name": "proctor-grader" },
+  "author_secrets": { "profile": "nearai" },
+  "capabilities": {
+    "network": [{ "host": "cloud-api.near.ai", "timeout_secs": 120 }]
+  }
+}

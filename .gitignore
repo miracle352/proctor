@@ -1,0 +1,6 @@
+target/
+*.wasm
+.env
+.env.*
+node_modules/
+/sets/private/
