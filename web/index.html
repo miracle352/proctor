@@ -3,188 +3,234 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Proctor: sealed exams for AI models</title>
-  <meta name="description" content="Proctor tests AI models on questions they have never seen, grades them by code inside secure hardware, and records every score on NEAR.">
-  <meta name="theme-color" content="#0d0f0d">
+  <title>Proctor: exams no AI has seen before</title>
+  <meta name="description" content="Proctor tests AI models on sealed questions, marks the answers inside tamper-proof hardware, and puts every score on a public record.">
+  <meta name="theme-color" content="#f3f3f4">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <meta property="og:title" content="Proctor: sealed exams for AI models">
-  <meta property="og:description" content="Scores that can't be faked, on questions no model has seen.">
 </head>
 <body>
-  <div class="fissure" aria-hidden="true"><i></i></div>
+  <a class="skip" href="#room">Skip to the exam</a>
 
   <header class="nav">
     <a class="brand" href="#top" aria-label="Proctor home">
-      <svg viewBox="0 0 64 64" width="30" height="30" aria-hidden="true">
-        <path d="M19 9 44 6 55 24 50 52 23 58 9 36Z" fill="#d9d5c7"/>
-        <path d="M19 9 44 6 34 27Z" fill="#f1eee3"/>
-        <path d="M9 36 34 27 23 58Z" fill="#a9a698"/>
-        <path d="M34 27 55 24 50 52 23 58Z" fill="#c2bfb0"/>
-        <path class="brand-seam" d="M16 20 30 30 27 41 44 50" fill="none" stroke="#c6f53d" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>
-      </svg>
-      <span>Proctor</span>
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M6.5 11.5 14.5 21 26 7.5" fill="none" stroke="#3ddc5a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Proctor
     </a>
     <nav aria-label="Sections">
-      <a href="#results">Results</a>
       <a href="#how">How it works</a>
-      <a href="#sets">Sealed sets</a>
+      <a href="#scores">Scores</a>
       <a href="#write">Write questions</a>
-      <a href="#verify">Verify</a>
+      <a href="#faq">Questions people ask</a>
     </nav>
-    <a class="net" id="net" href="https://testnet.nearblocks.io/address/app.proctor-91796.testnet" target="_blank" rel="noopener">
-      <i></i><span>Reading NEAR testnet</span>
-    </a>
+    <a class="btn primary small" href="#room">Watch an exam</a>
   </header>
 
   <main id="top">
     <section class="hero">
-      <canvas id="rock" aria-hidden="true"></canvas>
-      <div class="hero-copy">
-        <h1>
-          <span class="line"><span>Exams no</span></span>
-          <span class="line"><span>model has</span></span>
-          <span class="line"><span>seen.</span></span>
-        </h1>
-        <p class="lede">Proctor tests AI models on sealed questions, grades the answers by code inside secure hardware, and writes every score to NEAR. Nobody can fake a result, and the people who wrote the questions are paid each time one is used.</p>
+      <div class="hero-text">
+        <h1><span>Any AI can pass a test it has already seen.</span> Proctor sets one it hasn't.</h1>
+        <p class="lede">Experts write the questions and keep them sealed. Tamper-proof hardware marks the answers. Every score goes on a public record that anyone can check.</p>
         <div class="actions">
-          <a class="btn solid" href="#results">See live results</a>
-          <a class="btn" href="#write">Write questions</a>
+          <a class="btn primary" href="#room">Watch a real exam</a>
+          <a class="btn ghost" href="#scores">See the scores</a>
         </div>
+        <p class="built">Built on NEAR, OutLayer and NEAR AI Cloud.</p>
       </div>
-      <dl class="hero-stats" id="stats" aria-live="polite">
-        <div><dt>Certificates on chain</dt><dd data-k="certs">–</dd></div>
-        <div><dt>Sealed sets</dt><dd data-k="sets">–</dd></div>
-        <div><dt>Paid to question writers</dt><dd data-k="paid">–</dd></div>
-        <div><dt>Grader build</dt><dd data-k="grader" class="mono">–</dd></div>
-      </dl>
+      <figure class="bust">
+        <canvas id="bust" aria-label="Marble portrait of Socrates, drawn in ink dots"></canvas>
+        <figcaption>Socrates questioned everyone he met. He never handed out the questions first.</figcaption>
+      </figure>
     </section>
 
-    <div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
-
-    <section class="chalk" id="why">
-      <div class="wrap why">
-        <h2>A test stops working the day its questions leak.</h2>
-        <div class="why-body">
-          <p>Models are trained on the internet, and public test questions are on the internet. A high score can mean a model is capable, or that it has seen the answers. From the outside you can't tell which.</p>
-          <p>Keeping questions private doesn't fix it. To score a model you have to send it the questions, and then the company running the model has them. And a private test nobody can inspect can be wrong without anyone knowing.</p>
-          <ul class="facts">
-            <li><time datetime="2026-11-03">3 Nov 2026</time><span>Researchers showed the top model on a leading coding benchmark reciting hidden grading rules it was never given. <a href="https://r40.org/papers/kimi_k31_benchmark_audit.pdf" target="_blank" rel="noopener">Read the audit</a></span></li>
-            <li><time datetime="2025-09-20">Sep 2025</time><span>The makers of Humanity's Last Exam checked their own answer key and found about 18% of it wrong.</span></li>
-            <li><time datetime="2026-10-03">3 Oct 2026</time><span>NEAR's co-founder listed private-test benchmarks with certified results among the things he wants built.</span></li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="how" id="how">
-      <div class="wrap how-grid">
-        <div class="core" aria-hidden="true">
-          <div class="core-sample" id="core">
-            <i data-s="0"></i><i data-s="1"></i><i data-s="2"></i><i data-s="3"></i><i data-s="4"></i>
+    <section class="room-wrap" id="room" aria-labelledby="room-h">
+      <div class="room">
+        <div class="room-head">
+          <div>
+            <h2 id="room-h">Watch a real exam</h2>
+            <p>These are replays of exams already taken and recorded on NEAR. Pick one.</p>
           </div>
-          <p class="core-note">A question's life, top to bottom</p>
+          <div class="picker" id="picker" role="tablist" aria-label="Recorded exams">
+            <span class="sk" style="width:9rem"></span><span class="sk" style="width:9rem"></span><span class="sk" style="width:9rem"></span>
+          </div>
         </div>
-        <ol class="steps" id="steps">
-          <li data-s="0">
-            <h3>Seal</h3>
-            <p>A writer's questions are encrypted so that one exact build of the grading program can open them, and only inside secure hardware. We can't read them. The writer's own laptop is the last place they exist in the clear.</p>
+
+        <ol class="track" id="track">
+          <li><b>Sealed</b><span>The questions are locked. Nobody can read them, including us.</span></li>
+          <li><b>Asked</b><span>Secure hardware opens them and puts each one to the AI.</span></li>
+          <li><b>Marked</b><span>Plain code checks every answer against the key.</span></li>
+          <li><b>Recorded</b><span>Only the score comes out, onto a public record.</span></li>
+        </ol>
+
+        <div class="room-body">
+          <div class="sheet" id="sheet" aria-live="off">
+            <div class="sk-rows"></div>
+          </div>
+          <aside class="result" id="result" aria-live="polite">
+            <p class="result-wait">Reading the record from NEAR</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="how" id="how" aria-labelledby="how-h">
+      <div class="wrap">
+        <h2 id="how-h">It works like an exam hall</h2>
+        <p class="sub">You already know the rules that make a school exam fair. Proctor applies the same four to AI.</p>
+        <ol class="steps">
+          <li>
+            <svg class="art" viewBox="0 0 200 130" aria-hidden="true">
+              <rect class="a-paper" x="52" y="18" width="96" height="70" rx="6"/>
+              <path class="a-lines" d="M66 36h68M66 50h68M66 64h44"/>
+              <rect class="a-env" x="30" y="48" width="140" height="70" rx="10"/>
+              <path class="a-flap" d="M30 58 100 96 170 58"/>
+              <circle class="a-seal" cx="100" cy="96" r="13"/>
+              <path class="a-tick" d="M93.500 96l4.500 5 8.500-10"/>
+            </svg>
+            <h3>The questions stay sealed</h3>
+            <p>An expert writes questions with one correct answer and locks them. A fingerprint of the set goes on the public record first, so the questions can't be swapped later.</p>
           </li>
-          <li data-s="1">
-            <h3>Commit</h3>
-            <p>A fingerprint of the set goes on NEAR before any model is asked anything, with a stake behind the answer key. After that the set can't be swapped or quietly edited.</p>
+          <li>
+            <svg class="art" viewBox="0 0 200 130" aria-hidden="true">
+              <rect class="a-box" x="34" y="20" width="132" height="92" rx="14"/>
+              <rect class="a-chip" x="72" y="42" width="56" height="48" rx="8"/>
+              <path class="a-pins" d="M84 42V30M100 42V30M116 42V30M84 102V90M100 102V90M116 102V90M72 56H60M72 76H60M140 56h-12M140 76h-12"/>
+              <path class="a-lock" d="M92 66v-5a8 8 0 0 1 16 0v5"/>
+              <rect class="a-lockbody" x="88" y="65" width="24" height="17" rx="4"/>
+            </svg>
+            <h3>The exam is sat behind a locked door</h3>
+            <p>The questions are opened only inside secure hardware, where the AI answers them. Nobody outside can look in, not the AI's maker and not Proctor.</p>
           </li>
-          <li data-s="2">
-            <h3>Run</h3>
-            <p>Someone pays for a run. The contract starts the grader, the grader checks the set against its fingerprint, asks the model, and marks each answer with plain code. No AI judges another AI.</p>
+          <li>
+            <svg class="art" viewBox="0 0 200 130" aria-hidden="true">
+              <rect class="a-paper" x="46" y="14" width="108" height="102" rx="8"/>
+              <path class="a-lines" d="M62 36h50M62 58h50M62 80h50M62 102h34"/>
+              <path class="a-mark m1" d="M124 35l5 5 10-11"/>
+              <path class="a-mark m2" d="M124 57l5 5 10-11"/>
+              <path class="a-mark bad m3" d="M126 74l11 11M137 74l-11 11"/>
+            </svg>
+            <h3>A machine marks it, with no opinions</h3>
+            <p>Each answer is checked against the answer key by a short program. There is no second AI judging the first, and no person who can be leaned on.</p>
           </li>
-          <li data-s="3">
-            <h3>Record</h3>
-            <p>Only the score leaves the hardware. The contract stores it as a certificate, pays the writers, and if the model's host could see the questions, marks the set as seen by that company.</p>
-          </li>
-          <li data-s="4">
-            <h3>Reveal</h3>
-            <p>After a set number of runs the questions are published. Anyone can check them against the fingerprint, challenge a wrong answer key for a share of the stake, and recompute every score without the bad questions.</p>
+          <li>
+            <svg class="art" viewBox="0 0 200 130" aria-hidden="true">
+              <rect class="a-board" x="24" y="16" width="152" height="98" rx="10"/>
+              <rect class="a-note n1" x="40" y="32" width="52" height="38" rx="4"/>
+              <rect class="a-note n2" x="104" y="30" width="52" height="38" rx="4"/>
+              <rect class="a-note n3" x="72" y="68" width="56" height="34" rx="4"/>
+              <circle class="a-pin" cx="66" cy="36" r="4"/><circle class="a-pin" cx="130" cy="34" r="4"/><circle class="a-pin" cx="100" cy="72" r="4"/>
+            </svg>
+            <h3>The result goes on the noticeboard</h3>
+            <p>Every score is written to NEAR, a public record nobody can edit. The question writer is paid each time their questions are used.</p>
           </li>
         </ol>
       </div>
     </section>
 
-    <section class="results" id="results">
+    <section class="why" aria-labelledby="why-h">
       <div class="wrap">
-        <div class="head">
-          <h2>Live results</h2>
-          <p>Read from the contract when you opened this page. Scores count only certificates made by the current grader build.</p>
+        <h2 id="why-h">A high score can mean the AI is capable. It can also mean it has read the answers.</h2>
+        <div class="versus">
+          <div>
+            <h3>How AI is tested today</h3>
+            <ul>
+              <li>The test questions are published online.</li>
+              <li>AI models learn from what is online, tests included.</li>
+              <li>Keeping a test private doesn't help: to use it you must send it to the AI's maker.</li>
+              <li>The company that built the AI often reports its own score.</li>
+            </ul>
+          </div>
+          <div class="with">
+            <h3>With Proctor</h3>
+            <ul>
+              <li>Questions are sealed from the day they are written.</li>
+              <li>They are opened only inside hardware nobody can look into.</li>
+              <li>If an AI's maker could have read a set, that set is flagged for good.</li>
+              <li>Scores are recorded by a public contract, not reported by anyone.</li>
+            </ul>
+          </div>
         </div>
-        <div class="board" id="board"><p class="loading">Reading certificates from NEAR…</p></div>
-        <div class="gap" id="gap"></div>
       </div>
     </section>
 
-    <section class="sets" id="sets">
+    <section class="scores" id="scores" aria-labelledby="scores-h">
       <div class="wrap">
-        <div class="head">
-          <h2>Sealed sets</h2>
-          <p>Each row is a commitment on chain. A set marked as seen has been sent to a model whose host could read it, so later scores from that company on that set mean less.</p>
+        <div class="sec-head">
+          <h2 id="scores-h">Scores on the record</h2>
+          <p id="tally" class="sub"><span class="sk" style="width:22rem"></span></p>
         </div>
-        <div class="ledger" id="ledger"></div>
+        <div id="board" class="board"><div class="sk-card"></div><div class="sk-card"></div></div>
+
+        <h3 class="minor">Question sets</h3>
+        <p class="sub">A set marked as seen was put to an AI whose maker could read it. Later scores from that company on that set count for less.</p>
+        <div class="table-scroll"><table class="sets" id="sets">
+          <thead><tr><th>Set</th><th>Questions</th><th>Use</th><th>Status</th><th>Fingerprint</th></tr></thead>
+          <tbody><tr><td colspan="5"><span class="sk" style="width:60%"></span></td></tr></tbody>
+        </table></div>
       </div>
     </section>
 
-    <section class="certs" id="certs-sec">
-      <div class="wrap">
-        <div class="head">
-          <h2>Latest certificates</h2>
-          <p>Select one to see its questions marked right or wrong and the receipts behind it.</p>
-        </div>
-        <div class="cert-list" id="certs"></div>
-      </div>
-    </section>
-
-    <section class="chalk tools">
+    <section class="tools" id="write" aria-labelledby="write-h">
       <div class="wrap tools-grid">
-        <div class="tool" id="write">
-          <h2>Write questions</h2>
-          <p>Add questions with one exact answer. This page builds the sealed file and its fingerprint in your browser. Nothing you type here is sent anywhere.</p>
+        <div class="tool">
+          <h2 id="write-h">Write questions, get paid when they're used</h2>
+          <p>Add questions that have one exact answer. This page builds the sealed file and its fingerprint on your own computer. Nothing you type is sent anywhere.</p>
           <form id="seal-form" autocomplete="off">
             <div class="row2">
-              <label>Set name<input name="set_id" required pattern="[a-z0-9-]{3,40}" placeholder="tax-2026-a"></label>
+              <label>Name for this set<input name="set_id" required pattern="[a-z0-9\-]{3,40}" placeholder="tax-2026-a" title="Lower-case letters, digits and dashes"></label>
               <label>Your NEAR account<input name="author" required placeholder="you.testnet"></label>
             </div>
             <div id="qs"></div>
             <div class="form-actions">
-              <button type="button" class="btn dark" id="add-q">Add a question</button>
-              <button type="submit" class="btn solid">Build sealed file</button>
+              <button type="button" class="btn ghost" id="add-q">Add a question</button>
+              <button type="submit" class="btn primary">Build sealed file</button>
             </div>
           </form>
           <div class="out" id="seal-out" hidden></div>
         </div>
-        <div class="tool" id="verify">
-          <h2>Verify a revealed set</h2>
-          <p>When a set is published, paste its file here. Your browser computes the fingerprint and compares it with what was committed on chain before any model was asked.</p>
-          <textarea id="verify-in" rows="9" spellcheck="false" placeholder='{"set_id":"…","items":[…]}'></textarea>
-          <button class="btn solid" id="verify-btn" type="button">Check fingerprint</button>
+        <div class="tool">
+          <h2>Check a published set</h2>
+          <p>After a set has been used enough, its questions are published. Paste the file here and your browser confirms it is the same set that was fingerprinted before any AI saw it.</p>
+          <textarea id="verify-in" rows="8" spellcheck="false" placeholder='{"set_id":"…","items":[…]}' aria-label="Published set file"></textarea>
+          <button class="btn primary" id="verify-btn" type="button">Check fingerprint</button>
           <div class="out" id="verify-out" hidden></div>
         </div>
       </div>
     </section>
+
+    <section class="faq" id="faq" aria-labelledby="faq-h">
+      <div class="wrap faq-grid">
+        <h2 id="faq-h">Questions people ask</h2>
+        <div>
+          <details open><summary>Who is this for?</summary><p>Anyone who has to choose an AI and can't afford to be wrong: a hospital, a law firm, a bank, a school. It is also for experts who want to be paid for writing good questions in their field.</p></details>
+          <details><summary>What does "sealed" mean?</summary><p>The questions are encrypted so that only one exact version of the marking program can open them, and only inside secure hardware. The writer's own computer is the last place they exist in readable form.</p></details>
+          <details><summary>Can Proctor read the questions or change a score?</summary><p>No. We never hold the questions in readable form, and scores are stored by a public contract that checks each one came from the right marking program and the right question set.</p></details>
+          <details><summary>What if the AI runs on its maker's own servers?</summary><p>Then its maker could have read the questions, and Proctor says so. The set is permanently marked as seen by that company. Models hosted inside secure hardware don't have this problem.</p></details>
+          <details><summary>What if a question or its answer is wrong?</summary><p>Once a set is published, anyone can challenge an answer by putting up a small deposit. If the challenge holds, they are paid from the writer's stake and every score is recounted without that question.</p></details>
+          <details><summary>Is this live?</summary><p>It runs today on NEAR's test network with real AI models. Every number on this page is read from the contract when you open it. It has not had a security audit.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="close">
+      <div class="wrap">
+        <h2>Before you trust an AI's score, ask whether it had seen the test.</h2>
+        <a class="btn primary" href="#room">Watch a real exam</a>
+      </div>
+    </section>
   </main>
 
-  <footer class="foot" style="padding-bottom:0;overflow:hidden">
+  <footer class="foot">
     <div class="wrap foot-grid">
-      <div>
-        <strong>Proctor</strong>
-        <p>Built at NEAR Hackathon, November 2026. Running on NEAR testnet with OutLayer and NEAR AI Cloud. Not audited.</p>
-      </div>
+      <p>Proctor was built at the NEAR Hackathon, November 2026. It runs on NEAR's test network and has not been audited.</p>
       <ul>
-        <li><a href="https://testnet.nearblocks.io/address/app.proctor-91796.testnet" target="_blank" rel="noopener">Contract on NEAR testnet</a></li>
-        <li><a href="https://outlayer.ai" target="_blank" rel="noopener">OutLayer, where the grader runs</a></li>
+        <li><a href="https://testnet.nearblocks.io/address/app.proctor-91796.testnet" target="_blank" rel="noopener">The contract on NEAR</a></li>
+        <li><a href="https://outlayer.ai" target="_blank" rel="noopener">OutLayer, the secure hardware</a></li>
         <li><a href="https://cloud.near.ai" target="_blank" rel="noopener">NEAR AI Cloud, where the models run</a></li>
       </ul>
+      <p class="credit">Portrait of Socrates, Roman marble, Louvre. Photograph by Eric Gaba, public domain, from Wikimedia Commons.</p>
     </div>
-    <div class="wordmark" aria-hidden="true">Proctor</div>
   </footer>
 
-  <dialog id="drawer" aria-labelledby="drawer-title"></dialog>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -1,215 +1,206 @@
-import "@fontsource/big-shoulders-display/latin-900";
-import "@fontsource/hanken-grotesk/latin-400";
-import "@fontsource/hanken-grotesk/latin-500";
-import "@fontsource/hanken-grotesk/latin-600";
-import "@fontsource/jetbrains-mono/latin-400";
-import "@fontsource/jetbrains-mono/latin-500";
+import "@fontsource/bricolage-grotesque/latin-600.css";
+import "@fontsource/bricolage-grotesque/latin-700.css";
+import "@fontsource/bricolage-grotesque/latin-800.css";
+import "@fontsource/hanken-grotesk/latin-400.css";
+import "@fontsource/hanken-grotesk/latin-500.css";
+import "@fontsource/hanken-grotesk/latin-600.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
 import "./style.css";
-import { mountRock } from "./rock.js";
 import { CONTRACT, load, short, near } from "./chain.js";
+import { mountBust } from "./bust.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const pct = (k, n) => (n ? Math.round((100 * k) / n) : 0);
 const EXPLORER = "https://testnet.nearblocks.io";
-
-const rock = mountRock($("#rock"));
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const wait = (ms) => new Promise((r) => setTimeout(r, still ? 0 : ms));
 let state = null;
 
-/* page chrome */
-const nav = $(".nav"), fissure = $(".fissure");
-const onScroll = () => {
-  nav.classList.toggle("stuck", scrollY > 40);
-  const max = document.documentElement.scrollHeight - innerHeight;
-  fissure.style.setProperty("--p", max > 0 ? (scrollY / max).toFixed(4) : 0);
+mountBust($("#bust"), "/socrates.png").catch(() => $(".bust").remove());
+
+/* names a visitor can read */
+const modelName = (m) => m.split("/").pop();
+const maker = (m) => m.split("/")[0].replace(/^[a-z]/, (c) => c.toUpperCase());
+function setLabel(id) {
+  const part = id.split("-").pop().toUpperCase();
+  if (id.includes("-original-")) return `Published maths questions, part ${part}`;
+  if (id.includes("-twin-")) return `Rewritten maths questions, part ${part}`;
+  return id;
+}
+const ICON = {
+  right: '<svg viewBox="0 0 24 24"><path d="M5 12.5l5 5.5 9-11"/></svg>',
+  wrong: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  none: '<svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>',
 };
+
+/* page chrome */
+const nav = $(".nav");
+const whyH = $(".why h2");
+whyH.innerHTML = whyH.textContent.split(" ").map((w) => `<span class="w">${w}</span>`).join(" ");
+const words = [...whyH.children];
+function onScroll() {
+  nav.classList.toggle("stuck", scrollY > 8);
+  const r = whyH.getBoundingClientRect();
+  const k = (innerHeight * 0.88 - r.top) / (innerHeight * 0.5);
+  words.forEach((w, i) => w.style.setProperty("--k", Math.max(0, Math.min(1, k * words.length - i)).toFixed(2)));
+}
 addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
-// the core sample lights the layer for whichever step is nearest mid-screen
-const steps = [...document.querySelectorAll("#steps li")];
-const layers = [...document.querySelectorAll("#core i")];
-const stepWatch = new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    if (!e.isIntersecting) continue;
-    const s = e.target.dataset.s;
-    steps.forEach((li) => li.classList.toggle("on", li.dataset.s === s));
-    layers.forEach((l) => l.classList.toggle("on", +l.dataset.s <= +s));
-  }
-}, { rootMargin: "-45% 0px -45% 0px" });
-steps.forEach((li) => stepWatch.observe(li));
+const seen = new IntersectionObserver((es) => es.forEach((e) => {
+  if (e.isIntersecting) { e.target.classList.add("on"); seen.unobserve(e.target); }
+}), { threshold: 0.45 });
+document.querySelectorAll(".steps li").forEach((li) => seen.observe(li));
 
-// the limestone headline inks in word by word as it crosses the screen
-const whyH = $(".why h2");
-whyH.innerHTML = whyH.textContent.split(" ").map((w) => `<span>${w}</span>`).join(" ");
-const whyWords = [...whyH.children];
-const inkWords = () => {
-  const r = whyH.getBoundingClientRect();
-  const k = (innerHeight * 0.85 - r.top) / (innerHeight * 0.55);
-  whyWords.forEach((w, i) => w.style.setProperty("--ink", Math.max(0, Math.min(1, k * whyWords.length - i)).toFixed(2)));
-};
-addEventListener("scroll", inkWords, { passive: true });
-inkWords();
+/* the exam room */
+const picker = $("#picker"), sheet = $("#sheet"), result = $("#result"), track = [...$("#track").children];
+const proof = document.createElement("div");
+proof.className = "proof"; proof.id = "proof"; proof.hidden = true;
+$(".room-body").after(proof);
+let current = null, token = 0, roomInView = false, played = false;
 
-const reveal = new IntersectionObserver((entries) => {
-  for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); reveal.unobserve(e.target); }
-}, { threshold: 0.25 });
-
-// numbers count up once when they first get real data
-function count(el, to, fmt = (v) => Math.round(v).toLocaleString()) {
-  const t0 = performance.now(), dur = 1100;
-  const tick = (now) => {
-    const k = Math.min((now - t0) / dur, 1), e = 1 - Math.pow(1 - k, 4);
-    el.textContent = fmt(to * e);
-    if (k < 1) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
-
-// hashes settle from noise into place when you point at them
-function scramble(el) {
-  const final = el.dataset.full || el.textContent, chars = "0123456789abcdef";
-  let f = 0;
-  const id = setInterval(() => {
-    el.textContent = [...final].map((c, i) => (i < f || c === "…" ? c : chars[(Math.random() * 16) | 0])).join("");
-    if ((f += 2) > final.length) { el.textContent = final; clearInterval(id); }
-  }, 22);
-}
-
-const MARK = { 1: ["r", "right"], 0: ["w", "wrong"], x: ["f", "no answer"], "-": ["", "not asked yet"] };
-const tiles = (marks, big) => `<div class="tiles">${[...marks].map((ch, i) =>
-  `<i class="${MARK[ch][0]}" style="--i:${i}" ${big ? `title="Question ${i + 1}: ${MARK[ch][1]}"` : ""}></i>`).join("")}</div>`;
-
-function render(d) {
-  // hero numbers
-  const stat = (k) => $(`#stats [data-k="${k}"]`);
-  count(stat("certs"), d.certs.length);
-  count(stat("sets"), Object.keys(d.sets).length);
-  count(stat("paid"), d.paid, (v) => `${v.toFixed(3)} NEAR`);
-  stat("grader").textContent = short(d.config.grader_version, 8);
-
-  // ticker
-  const row = d.certs.slice(0, 28).map((c) =>
-    `<span><i class="${c.sealed ? "" : "x"}"></i><b>${esc(c.model)}</b>${esc(c.set_id)} #${c.start} ${c.correct}/${c.asked} block ${c.block_height.toLocaleString()}</span>`).join("");
-  $("#ticker").innerHTML = row + row;
-
-  // leaderboard
-  $("#board").innerHTML = d.models.length ? d.models.map((m) => {
-    const head = m.twinScore !== null ? Math.round(m.twinScore * 100) : pct(m.correct, m.asked);
-    return `<article class="model">
-      <div class="model-name">${esc(m.model.split("/").pop())}
-        <small>${esc(m.model)}</small>
-        <span class="tag ${m.sealed ? "sealed" : "exposed"}">${m.sealed ? "Ran in attested hardware" : "Host could read the questions"}</span>
-      </div>
-      <div class="bars">${m.perSet.map((s) => `
-        <div class="bar ${s.set_id.includes("-twin-") ? "twin" : ""}">
-          <span>${esc(s.set_id)}</span>
-          <span class="bar-track"><i class="bar-fill" style="--v:${s.asked ? s.correct / s.asked : 0}"></i></span>
-          <b>${s.correct}/${s.asked}</b>
-        </div>`).join("")}</div>
-      <div class="score">${head}%<small>${m.twinScore !== null ? `on ${m.twinN} unseen questions` : `on ${m.asked} questions`}</small></div>
-    </article>`;
-  }).join("") : `<p class="loading">No certificates yet for this grader build.</p>`;
-  document.querySelectorAll(".model").forEach((el) => reveal.observe(el));
-
-  // contamination gap
-  const span = 20; // axis runs from -20 to +20 points
-  const pos = (v) => `${50 + Math.max(-span, Math.min(span, v * 100)) / span * 50}%`;
-  $("#gap").innerHTML = d.models.filter((m) => m.gap).map((m) => {
-    const g = m.gap, sign = g.mean >= 0 ? "+" : "−";
-    const clear = g.lo > 0;
-    return `<div class="gap-card">
-      <div>
-        <h3>${esc(m.model.split("/").pop())}: seen versus unseen</h3>
-        <div class="gap-num">${sign}${Math.abs(g.mean * 100).toFixed(1)} pts</div>
-        <p>Score on ${g.n} public questions minus score on ${g.n} sealed twins of the same questions, with fresh names and numbers of the same size. ${clear
-          ? "The whole range sits above zero, so this model does better on questions it could have memorised."
-          : "The range touches zero, so on this set there is no sign the model is leaning on memorised answers."}</p>
-      </div>
-      <div class="axis" role="img" aria-label="Gap ${(g.mean * 100).toFixed(1)} points, 90% range ${(g.lo * 100).toFixed(1)} to ${(g.hi * 100).toFixed(1)}">
-        <i class="zero"></i>
-        <i class="range" style="left:${pos(g.lo)};width:calc(${pos(g.hi)} - ${pos(g.lo)})"></i>
-        <i class="dot" style="left:${pos(g.mean)}"></i>
-        <span style="left:0%;transform:none">−${span}</span><span style="left:50%">0</span><span style="left:100%;transform:translateX(-100%)">+${span}</span>
-      </div>
-    </div>`;
-  }).join("");
-
-  // sets
-  $("#ledger").innerHTML = Object.entries(d.sets).map(([id, s]) => `
-    <div class="set">
-      <div class="set-id">${esc(id)}<small>${s.size} questions, ${s.authors.length} writer${s.authors.length > 1 ? "s" : ""}, ${near(s.stake)} NEAR staked</small></div>
-      <div class="hashcell" data-full="${esc(s.sha256)}" title="Fingerprint committed on chain">${esc(s.sha256)}</div>
-      <div class="wear">${s.revealed ? "Revealed, open to challenge" : `${s.runs} of ${s.retire_after} runs used`}
-        <div class="wear-track"><i style="--v:${Math.min(100, (100 * s.runs) / s.retire_after)}%"></i></div></div>
-      <div class="seen">${s.exposed_to.length
-        ? s.exposed_to.map((p) => `<span class="tag exposed">Seen by ${esc(p)}</span>`).join("")
-        : `<span class="tag sealed">Unseen</span>`}${s.faulty.length ? `<span class="tag exposed">${s.faulty.length} faulty</span>` : ""}</div>
-    </div>`).join("");
-  document.querySelectorAll(".hashcell").forEach((el) => el.addEventListener("pointerenter", () => scramble(el)));
-
-  // certificates, grouped into one tablet per model and set
-  const groups = new Map();
+function buildGroups(d) {
+  const map = new Map();
   for (const c of d.certs) {
     const key = `${c.model}|${c.set_id}`;
-    if (!groups.has(key)) groups.set(key, { key, model: c.model, set_id: c.set_id, sealed: c.sealed, certs: [], marks: {} });
-    const g = groups.get(key);
+    if (!map.has(key)) map.set(key, { key, model: c.model, set_id: c.set_id, sealed: c.sealed, certs: [], marks: {} });
+    const g = map.get(key);
     g.certs.push(c);
     [...c.results].forEach((ch, i) => { if (!(c.start + i in g.marks)) g.marks[c.start + i] = ch; });
   }
-  d.groups = [...groups.values()];
-  $("#certs").innerHTML = d.groups.map((g) => {
+  const rank = (g) => (g.sealed ? 0 : 2) + (g.set_id.includes("-twin-") ? 0 : 1);
+  return [...map.values()].map((g) => {
     const size = d.sets[g.set_id]?.size || 0;
-    const marks = Array.from({ length: size }, (_, i) => g.marks[i] ?? "-").join("");
-    const right = [...marks].filter((m) => m === "1").length, asked = [...marks].filter((m) => m !== "-").length;
-    g.marksStr = marks; g.right = right; g.asked = asked;
-    const blocks = g.certs.map((c) => c.block_height);
-    return `<button class="cert ${g.sealed ? "" : "x"}" data-key="${esc(g.key)}">
-      <span class="cert-top"><span>${g.certs.length} certificate${g.certs.length > 1 ? "s" : ""}</span><span>blocks ${Math.min(...blocks).toLocaleString()}–${String(Math.max(...blocks)).slice(-4)}</span></span>
-      <span class="cert-model">${esc(g.model.split("/").pop())}</span>
-      <span class="cert-meta">${esc(g.set_id)}</span>
-      ${tiles(marks)}
-      <span class="cert-score">${right}<small>of ${asked} right${asked < size ? `, ${size - asked} not yet asked` : ""}</small></span>
-    </button>`;
-  }).join("");
+    g.list = Array.from({ length: size }, (_, i) => g.marks[i] ?? "-");
+    g.right = g.list.filter((m) => m === "1").length;
+    g.asked = g.list.filter((m) => m !== "-").length;
+    return g;
+  }).sort((a, b) => rank(a) - rank(b) || a.set_id.localeCompare(b.set_id));
 }
 
-/* certificate drawer */
-const drawer = $("#drawer");
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".cert");
-  if (btn && state) openGroup(state.groups.find((g) => g.key === btn.dataset.key));
-  if (e.target === drawer || e.target.closest(".dw-close")) drawer.close();
+function renderPicker(groups) {
+  picker.innerHTML = groups.map((g) =>
+    `<button role="tab" data-key="${esc(g.key)}" aria-selected="${current?.key === g.key}"><b>${esc(modelName(g.model))}</b>${esc(setLabel(g.set_id))}</button>`).join("");
+}
+picker.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (b && state) run(state.groups.find((g) => g.key === b.dataset.key));
 });
-function openGroup(g) {
-  const set = state.sets[g.set_id];
-  const rows = g.certs.slice().sort((a, b) => a.start - b.start).map((c) => `
-    <tr><td>#${c.id}</td><td>Q${c.start + 1}${c.asked > 1 ? `–${c.start + c.asked}` : ""}</td>
-    <td>${c.correct}/${c.asked}</td>
-    <td><a href="${EXPLORER}/blocks/${c.block_height}" target="_blank" rel="noopener">${c.block_height.toLocaleString()}</a></td>
-    <td class="mono">${c.chat_ids.map((id) => esc(short(id, 5))).join(" ") || "none"}</td></tr>`).join("");
-  drawer.innerHTML = `<div class="dw">
-    <button class="dw-close">Close</button>
-    <div><p class="dw-note">${esc(g.set_id)}</p><h2 id="drawer-title">${esc(g.model)}</h2></div>
-    <div class="dw-score">${g.right}/${g.asked}<small>questions right</small></div>
-    ${tiles(g.marksStr, true)}
-    <p class="dw-note">${g.sealed
-      ? "This model ran inside attested hardware on NEAR AI Cloud, so nobody outside it saw the questions."
-      : `This model is hosted outside attested hardware. Its host could read the questions, so the set is now marked as seen by ${esc(g.model.split("/")[0])}.`}</p>
-    <dl>
+
+// widths for the blacked-out question text, steady for a given question
+const inkWidth = (key, i) => { let h = 2166136261; for (const ch of key + i) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); h ^= h >>> 13; return 42 + ((h >>> 0) % 56); };
+
+async function run(g) {
+  const my = ++token, live = () => my === token;
+  current = g; played = true;
+  renderPicker(state.groups);
+  proof.hidden = true;
+  const set = state.sets[g.set_id], blocks = g.certs.map((c) => c.block_height);
+  const lo = Math.min(...blocks), hi = Math.max(...blocks);
+
+  sheet.innerHTML = `
+    <div class="sheet-top"><strong>${esc(setLabel(g.set_id))}</strong><span>${g.list.length} questions, each with one exact answer</span></div>
+    <div class="rows" style="--n:${Math.ceil(g.list.length / 2)}">${g.list.map((m, i) =>
+      `<div class="row" data-s="${m === "-" ? "skip" : "wait"}"><span class="qn">Q${i + 1}</span><span class="ink" style="--w:${inkWidth(g.key, i)}%"></span><span class="mk"></span></div>`).join("")}</div>
+    <p class="sheet-foot">The question text is blacked out here because it is still sealed. It is published once this set retires.</p>`;
+  result.innerHTML = `
+    <h3><b>${esc(modelName(g.model))}</b>sitting ${esc(setLabel(g.set_id)).replace(/^./, (c) => c.toLowerCase())}</h3>
+    <div class="score"><span id="sc">0</span><small>of ${g.asked} right</small></div>
+    <p>${g.sealed
+      ? "This AI also ran inside secure hardware, so nobody saw the questions at any point."
+      : `This AI runs on ${esc(maker(g.model))}'s own servers, so ${esc(maker(g.model))} could have read the questions. Proctor has marked this set as seen by ${esc(maker(g.model))}.`}</p>
+    <div class="slip" id="slip"><strong>Recorded on NEAR</strong>
+      <span>${g.certs.length} certificate${g.certs.length > 1 ? "s" : ""}, written between blocks ${lo.toLocaleString()} and ${hi.toLocaleString()}.</span>
+      <a href="${EXPLORER}/blocks/${hi}" target="_blank" rel="noopener">Open block ${hi.toLocaleString()} on the public record</a></div>
+    <div class="result-actions"><button class="link-btn" id="again">Play it again</button><button class="link-btn" id="proof-btn" aria-expanded="false" aria-controls="proof">Show the proof</button></div>`;
+  $("#again").onclick = () => run(g);
+  $("#proof-btn").onclick = (e) => {
+    proof.hidden = !proof.hidden;
+    e.target.setAttribute("aria-expanded", !proof.hidden);
+    e.target.textContent = proof.hidden ? "Show the proof" : "Hide the proof";
+    if (!proof.hidden) proof.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
+  proof.innerHTML = `<dl>
       <dt>Set fingerprint</dt><dd class="mono">${esc(set.sha256)}</dd>
-      <dt>Matches commitment</dt><dd>${g.certs.every((c) => c.set_sha256 === set.sha256) ? "Yes, the contract checked every certificate before storing it" : "No"}</dd>
-      <dt>Grader build</dt><dd class="mono">${esc(g.certs[0].grader_version)}</dd>
+      <dt>Fingerprint check</dt><dd>${g.certs.every((c) => c.set_sha256 === set.sha256) ? "The contract checked every certificate against this fingerprint before storing it" : "Mismatch"}</dd>
+      <dt>Marking program</dt><dd class="mono">${esc(g.certs[0].grader_version)}</dd>
       <dt>Paid to writers</dt><dd>${near(g.certs.reduce((a, c) => a + BigInt(c.paid_to_authors), 0n).toString())} NEAR</dd>
     </dl>
-    <table class="dw-table">
-      <thead><tr><th>Certificate</th><th>Question</th><th>Right</th><th>Block</th><th>Model receipt</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <p class="dw-note">A receipt is the chat id NEAR AI Cloud signed inside its hardware. Its signature can be fetched from NEAR AI at /v1/signature/ followed by the full id.</p>
-  </div>`;
-  drawer.showModal();
+    <table><thead><tr><th>Certificate</th><th>Question</th><th>Right</th><th>Block</th><th>AI's signed receipt</th></tr></thead><tbody>${
+      g.certs.slice().sort((a, b) => a.start - b.start).map((c) => `<tr><td>#${c.id}</td><td>Q${c.start + 1}${c.asked > 1 ? `–${c.start + c.asked}` : ""}</td><td>${c.correct}/${c.asked}</td>
+        <td><a href="${EXPLORER}/blocks/${c.block_height}" target="_blank" rel="noopener">${c.block_height.toLocaleString()}</a></td>
+        <td class="mono">${c.chat_ids.map((id) => esc(short(id, 6))).join(" ") || "none"}</td></tr>`).join("")}</tbody></table>
+    <p class="proof-note">A receipt is the id of the conversation, signed by NEAR AI Cloud inside its hardware. The signature can be fetched from NEAR AI at /v1/signature/ followed by the full id.</p>`;
+
+  const rows = [...sheet.querySelectorAll('.row:not([data-s="skip"])')], marks = g.list.filter((m) => m !== "-");
+  const stage = (i, dur) => track.forEach((li, j) => { li.style.setProperty("--dur", `${dur}ms`); li.className = j < i ? "done" : j === i ? "now" : ""; });
+
+  stage(0, 900); await wait(900); if (!live()) return;
+  const askFor = Math.min(2200, 500 + rows.length * 90);
+  stage(1, askFor);
+  rows.forEach((r, i) => setTimeout(() => live() && r.dataset.s === "wait" && (r.dataset.s = "ask"), still ? 0 : (i * (askFor - 400)) / rows.length));
+  await wait(askFor); if (!live()) return;
+  const per = Math.max(70, Math.min(170, 2400 / rows.length));
+  stage(2, per * rows.length);
+  let right = 0;
+  for (const [i, r] of rows.entries()) {
+    const m = marks[i], s = m === "1" ? "right" : m === "0" ? "wrong" : "none";
+    r.dataset.s = s; r.querySelector(".mk").innerHTML = ICON[s];
+    if (m === "1") $("#sc").textContent = ++right;
+    await wait(per); if (!live()) return;
+  }
+  stage(3, 700); await wait(250); if (!live()) return;
+  $("#slip").classList.add("in");
+  await wait(700); if (!live()) return;
+  stage(4, 0);
 }
+
+new IntersectionObserver(([e]) => {
+  roomInView = e.isIntersecting;
+  if (roomInView && state && !played) run(state.groups[0]);
+}, { threshold: 0.3 }).observe($(".room"));
+
+/* scores */
+function renderBoard(d) {
+  $("#tally").textContent = `${d.certs.length} certificates on the record across ${Object.keys(d.sets).length} question sets. ${d.paid.toLocaleString(undefined, { maximumFractionDigits: 3 })} NEAR paid to question writers so far.`;
+  const pct = (a, b) => Math.round((100 * a) / b);
+  $("#board").innerHTML = d.models.map((m) => {
+    const of = (tag) => m.perSet.filter((s) => s.set_id.includes(tag)).reduce((a, s) => [a[0] + s.correct, a[1] + s.asked], [0, 0]);
+    const pub = of("-original-"), fresh = of("-twin-");
+    let verdict = "";
+    if (m.gap) {
+      const p = (x) => `${x > 0 ? "+" : ""}${(100 * x).toFixed(1)}`;
+      verdict = m.gap.lo <= 0
+        ? `<strong>No sign of memorising</strong><span>It scored ${pct(...pub)}% on the published questions and ${pct(...fresh)}% on rewritten versions it could not have seen. That is a difference of ${p(m.gap.mean)} points, and with ${m.gap.n} pairs the true figure could be anywhere from ${p(m.gap.lo)} to ${p(m.gap.hi)}.</span>`
+        : `<strong>Looks like memorising</strong><span>It scored ${pct(...pub)}% on the published questions but ${pct(...fresh)}% on rewritten versions, a drop of ${p(m.gap.mean)} points (between ${p(m.gap.lo)} and ${p(m.gap.hi)}).</span>`;
+    } else if (!m.sealed) {
+      verdict = `<strong>Treat with care</strong><span>${esc(maker(m.model))} could read these questions while answering, so the same set can't fairly be used on its models again.</span>`;
+    }
+    const head = m.twinN ? [pct(...fresh), `on ${m.twinN} questions it had never seen`] : [pct(m.correct, m.asked), `on ${m.asked} question${m.asked > 1 ? "s" : ""}`];
+    return `<article class="model">
+      <div><h3>${esc(modelName(m.model))}</h3>
+        <p class="host ${m.sealed ? "" : "open"}">${m.sealed ? "Ran inside secure hardware. Nobody saw the questions." : `Runs on ${esc(maker(m.model))}'s servers, which could read the questions.`}</p></div>
+      <div class="bars">${m.perSet.map((s) => `<div class="bar ${s.set_id.includes("-twin-") ? "fresh" : ""}"><span>${esc(setLabel(s.set_id))}</span><i style="--v:${(100 * s.correct) / s.asked}%"></i><b>${s.correct}/${s.asked}</b></div>`).join("")}</div>
+      <div class="total">${head[0]}%<small>${head[1]}</small></div>
+      ${verdict ? `<div class="verdict">${verdict}</div>` : ""}
+    </article>`;
+  }).join("") || `<p class="sub">No exams have been recorded yet.</p>`;
+
+  $("#sets tbody").innerHTML = Object.entries(d.sets).map(([id, s]) => `<tr>
+    <td>${esc(setLabel(id))}${setLabel(id) !== id ? `<small>${esc(id)}</small>` : ""}</td>
+    <td>${s.size}</td>
+    <td>${s.revealed ? "Published, open to challenge" : `${s.runs} of ${s.retire_after} runs`}</td>
+    <td>${s.exposed_to.length ? `<span class="status seen">Seen by ${s.exposed_to.map(esc).join(", ")}</span>` : `<span class="status">Unseen</span>`}</td>
+    <td><button class="copy" data-full="${esc(s.sha256)}" title="Copy the full fingerprint">${esc(short(s.sha256, 8))}</button></td></tr>`).join("");
+}
+$("#sets").addEventListener("click", async (e) => {
+  const b = e.target.closest(".copy");
+  if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.full); } catch { return; }
+  const was = b.textContent;
+  b.textContent = "Copied"; b.classList.add("done");
+  setTimeout(() => { b.textContent = was; b.classList.remove("done"); }, 1300);
+});
 
 /* write questions */
 const qs = $("#qs");
@@ -264,7 +255,7 @@ $("#seal-form").addEventListener("submit", async (e) => {
   out.innerHTML = `<strong>Sealed file built</strong>
     <span>${items.length} question${items.length > 1 ? "s" : ""}. Keep the file private until the set is retired. Its fingerprint is what goes on chain:</span>
     <code>${hash}</code>
-    <a class="btn dark" href="${url}" download="${esc(set_id)}.json">Download ${esc(set_id)}.json</a>
+    <a class="btn primary" href="${url}" download="${esc(set_id)}.json">Download ${esc(set_id)}.json</a>
     <span>Lock it to the grader build, then commit the fingerprint:</span>
     <pre>outlayer secrets set "$(python3 -c 'import json,sys;print(json.dumps({"PROCTOR_SET":open(sys.argv[1]).read()}))' ${esc(set_id)}.json)" \\
   --project proctor-91796.testnet/grader --profile ${esc(set_id)} --access allow-all \\
@@ -286,7 +277,6 @@ $("#verify-btn").addEventListener("click", async () => {
   if (hit) {
     out.className = "out ok";
     out.innerHTML = `<strong>Matches ${esc(hit[0])}</strong><span>These are the exact bytes committed on chain before the set was used in ${hit[1].runs} run${hit[1].runs === 1 ? "" : "s"}.</span><code>${hash}</code>`;
-    rock.pulse();
   } else {
     out.className = "out bad";
     out.innerHTML = `<strong>No committed set has this fingerprint</strong><span>Even one changed character gives a different fingerprint. Check the file is the original, with no added spaces or line breaks.</span><code>${hash}</code>`;
@@ -294,20 +284,24 @@ $("#verify-btn").addEventListener("click", async () => {
 });
 
 /* data */
-const net = $("#net");
-async function refresh(first) {
+async function refresh() {
   try {
     const d = await load();
     const fresh = !state || d.certs.length !== state.certs.length;
+    d.groups = buildGroups(d);
     state = d;
-    if (fresh) { render(d); if (!first) rock.pulse(); }
-    net.className = "net live";
-    net.querySelector("span").textContent = "Live on NEAR testnet";
+    if (!fresh) return;
+    renderBoard(d);
+    if (!current) {
+      renderPicker(d.groups);
+      if (!d.groups.length) { sheet.innerHTML = `<p class="sub">No exams have been recorded yet.</p>`; result.innerHTML = ""; }
+      else if (roomInView) run(d.groups[0]);
+    } else renderPicker(d.groups);
   } catch (err) {
-    net.className = "net fail";
-    net.querySelector("span").textContent = "Can't reach NEAR, retrying";
-    if (!state) $("#board").innerHTML = `<p class="loading">Couldn't read the contract (${esc(err.message)}). Retrying every 20 seconds.</p>`;
+    if (state) return;
+    const msg = `<p class="fail">Couldn't reach NEAR to read the record (${esc(err.message)}). Trying again every 20 seconds.</p>`;
+    result.innerHTML = msg; $("#board").innerHTML = msg; $("#tally").textContent = "";
   }
 }
-refresh(true).then(() => rock.pulse());
-setInterval(() => { if (!document.hidden) refresh(false); }, 20000);
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 20000);
