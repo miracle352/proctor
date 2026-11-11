@@ -3,7 +3,7 @@
 //! slice of the questions through NEAR AI Cloud, and prints a report that
 //! carries scores and hashes but never the questions.
 
-use proctor_grader::{is_correct, sha256_hex, Report, Set, INSTRUCTION};
+use proctor_grader::{sha256_hex, Report, Set, INSTRUCTION};
 use serde::Deserialize;
 use std::io::{self, Read, Write};
 
@@ -74,7 +74,7 @@ fn main() {
     let answers = net::ask_all(&api_key, &input.model, &prompts, input.max_tokens);
     for (item, answer) in slice.iter().zip(answers) {
         match answer {
-            Ok((text, chat_id)) => report.record(&item.author, is_correct(&item.answer, &text), Some(chat_id)),
+            Ok((text, chat_id)) => report.record_with_stakes(item, &text, chat_id),
             Err(_) => report.record(&item.author, false, None),
         }
     }

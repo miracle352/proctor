@@ -169,3 +169,4 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--i
 .dev-table code, .hint code { font: 400 0.85rem/1.4 var(--mono); background: var(--paper); padding: 0.1rem 0.35rem; border-radius: 6px; }
 .dev-table a, .hint a { color: var(--blue); }
 @media (max-width: 760px) { .tiles4 { grid-template-columns: 1fr 1fr; } .snips { grid-template-columns: 1fr; } }
+#lic-badges { flex-wrap: wrap; gap: 0.6rem; }

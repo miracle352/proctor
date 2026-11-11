@@ -100,6 +100,7 @@ function renderWho() {
   try { D = await load(); } catch (e) { $("#console-body").innerHTML = `<p class="fail">Couldn't reach NEAR (${esc(e.message)}). Reload to try again.</p>`; return; }
   $("#b-model").innerHTML = D.models.filter((m) => m.sealedN).map((m) => `<option value="${esc(m.model)}">${esc(modelName(m.model))}</option>`).join("");
   renderBadge(); renderTables(); renderConsole(); renderWho();
+  $("#lic-badges").innerHTML = D.wallets.map((w) => `<img src="/api/badge?model=${encodeURIComponent(w.model)}&skill=money" alt="${esc(modelName(w.model))} money licence" height="30">`).join(" ");
   try {
     const w = await wallet(); await w.initWallet();
     w.onAccount((a) => { me = a; renderWho(); renderConsole(); });

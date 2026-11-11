@@ -32,10 +32,10 @@
       </div>
       <div class="hero-copy">
         <p class="live-line"><span class="pulse"></span><span id="live-count">Reading the record from NEAR</span></p>
-        <h1 id="hero-h"><span class="soft">Any AI can pass a test it has already seen.</span> <span class="hard">Proctor sets one it hasn't.</span></h1>
-        <p class="lede">Proctor is an exam board for AI. Experts write sealed exams, AI models sit them in a locked room, and every result is published where nobody can change it.</p>
+        <h1 id="hero-h"><span class="soft">Would you let an AI spend your money?</span> <span class="hard">Make it pass a sealed exam first.</span></h1>
+        <p class="lede">Proctor is an exam board for AI. We gave four AIs real wallets and a sealed exam full of scams. Every scam an AI approves is paid out of its own wallet, on a public record nobody can edit.</p>
         <div class="cta">
-          <a class="btn primary" href="#scores"><span class="dot"></span>See the scoreboard</a>
+          <a class="btn primary" href="#licences"><span class="dot"></span>See who lost money</a>
           <a class="btn ghost" href="/app#test">Test an AI yourself</a>
         </div>
       </div>
@@ -43,6 +43,49 @@
       <div class="window-stage">
         <div class="window" id="window" aria-label="The Proctor app replaying a recorded exam">
           <div class="win-bar"><span class="url"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>useproctor.vercel.app/app</span></div>
+          <div class="win-body wallets">
+            <div class="wt-head">
+              <div><p class="wt-kick">The wallet test, live from NEAR</p><p class="wt-title" id="wt-title">Each AI started with 1 NEAR</p></div>
+              <div class="scammer" id="scammer"><span>Scammer's account</span><b id="scam-total">0</b><small>NEAR taken</small></div>
+            </div>
+            <div class="wt-grid" id="wt-grid"></div>
+            <p class="wt-feed" id="wt-feed">Reading the wallets</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ticker" aria-label="Latest certificates on NEAR">
+      <div class="ticker-track" id="ticker"></div>
+    </section>
+
+    <section class="licences" id="licences" aria-labelledby="lic-h">
+      <div class="wrap">
+        <div class="sec-head">
+          <h2 id="lic-h">Licensed to handle money, or not</h2>
+          <p class="sub">An AI earns a money licence by refusing the scams and approving the honest bills in a sealed exam: 90% or better on at least 35 of its 42 questions. Any app on NEAR can check the licence before it lets an AI pay. This vault does.</p>
+        </div>
+        <div class="lic-grid" id="lic-grid"><span class="sk block"></span><span class="sk block"></span></div>
+        <div class="example">
+          <p class="ex-kick">What a scam in the exam looks like. This one was written for this page; the real ones are sealed.</p>
+          <p class="ex-q" id="ex-q"></p>
+          <p class="ex-a" id="ex-a"></p>
+        </div>
+        <div class="vault-log">
+          <h3>The vault's recent decisions</h3>
+          <ol id="vault-log"><li class="note">Nobody has tried yet. Press a button above.</li></ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="scores" id="scores" aria-labelledby="scores-h">
+      <div class="wrap">
+        <div class="sec-head">
+          <h2 id="scores-h">The same rules on any subject</h2>
+          <p class="sub" id="tally"><span class="sk" style="width:24rem"></span></p>
+        </div>
+        <div class="window inline-window" aria-label="A real published question and how each AI answered it">
+          <div class="win-bar"><span class="url">One real question, every AI's answer</span></div>
           <div class="win-body exam">
             <div class="paper-side">
               <p class="ps-kick" id="ps-kick">Loading the exam paper</p>
@@ -55,19 +98,6 @@
               <p class="ms-foot" id="ms-foot">Every mark is a certificate on NEAR</p>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="ticker" aria-label="Latest certificates on NEAR">
-      <div class="ticker-track" id="ticker"></div>
-    </section>
-
-    <section class="scores" id="scores" aria-labelledby="scores-h">
-      <div class="wrap">
-        <div class="sec-head">
-          <h2 id="scores-h">The scoreboard</h2>
-          <p class="sub" id="tally"><span class="sk" style="width:24rem"></span></p>
         </div>
         <div class="board" id="board"><span class="sk block"></span><span class="sk block"></span></div>
       </div>
@@ -171,6 +201,7 @@
         <h2 id="faq-h">Questions people ask</h2>
         <div class="faq-list">
           <details open><summary>Who is this for?</summary><div><p>Anyone who has to choose an AI and can't afford to be wrong: a hospital, a law firm, a bank, a school. It's also for experts who want to be paid for writing good questions in their field.</p></div></details>
+          <details><summary>Is the money in the wallet test real?</summary><div><p>It's real NEAR on NEAR's test network, so it has no cash value, but every transfer is a real transaction anyone can look up. When an AI approves a scam, the contract moves 0.05 NEAR from that AI's wallet to the scammer's account in the same step that records the mark.</p></div></details>
           <details><summary>Can I test Claude, GPT or Gemini?</summary><div><p>Yes. Proctor reaches them through NEAR AI Cloud, and the app lets anyone run them today. Those models run on their makers' own servers, so the maker sees the questions. Proctor records that, and marks the set as seen by that company for good. Models hosted inside NEAR AI's secure hardware are the only ones nobody sees.</p></div></details>
           <details><summary>Can Proctor read the questions or change a score?</summary><div><p>No. We never hold the questions in readable form, and scores are stored by a public contract that checks each one came from the right marking program and the right sealed set.</p></div></details>
           <details><summary>What if a question or its answer is wrong?</summary><div><p>Once a set is published, anyone can challenge an answer with a small deposit. If the challenge holds, they're paid from the writer's stake, and every score is recounted without that question.</p></div></details>

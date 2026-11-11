@@ -124,6 +124,9 @@ struct Report {
     failures: u32,
     #[serde(default)]
     results: String,
+    /// What wrong answers on questions with stakes cost, in milliNEAR.
+    #[serde(default)]
+    lost_milli: u64,
 }
 
 #[derive(Deserialize)]
@@ -185,18 +188,62 @@ pub struct Proctor {
     cap_total: u32,
     usage: LookupMap<AccountId, DayCount>,
     usage_total: DayCount,
+    /// Each AI's own wallet, in yoctoNEAR. A scam it approves is paid out of it.
+    wallets: IterableMap<String, u128>,
+    /// Total each AI has lost to scams, in yoctoNEAR.
+    lost: IterableMap<String, u128>,
+    /// Where approved scams send the money: the scammer.
+    scam_sink: AccountId,
+    /// Certificate id -> what that run cost the AI.
+    cert_losses: LookupMap<u64, u128>,
+    /// What a licence for each skill requires.
+    skills: IterableMap<String, Skill>,
+    /// First answer per model, set and question; retries don't count.
+    marked: LookupMap<String, bool>,
+    /// model|set -> first answers asked, right, and when last answered.
+    tallies: LookupMap<String, Tally3>,
 }
 
-/// Layout before public runs existed, read once by `migrate`.
 #[near(serializers = [borsh])]
-struct ProctorV1 {
+struct ProctorV2 {
     owner: AccountId,
     outlayer: AccountId,
     grader_project: String,
+    /// sha256 of the grader wasm every run is pinned to.
     grader_version: String,
     sets: IterableMap<String, SetInfo>,
     certificates: Vector<Certificate>,
     challenges: Vector<Challenge>,
+    /// Builds whose marking matches the current one, so their certificates
+    /// still count toward scores. Always includes grader_version.
+    comparable: Vec<String>,
+    /// Accounts the owner runs exams from. No model list, no daily cap.
+    trusted: Vec<AccountId>,
+    public_models: IterableMap<String, PublicModel>,
+    /// Questions one account may ask per day, and all public accounts together.
+    cap_per_account: u32,
+    cap_total: u32,
+    usage: LookupMap<AccountId, DayCount>,
+    usage_total: DayCount,
+}
+
+/// A licence: pass `pass_percent` over at least `min_questions` first
+/// answers on these sets. It lapses `valid_days` after the last answer.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Skill {
+    pub sets: Vec<String>,
+    pub pass_percent: u8,
+    pub min_questions: u32,
+    pub valid_days: u32,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Default)]
+pub struct Tally3 {
+    pub asked: u32,
+    pub right: u32,
+    pub last_ms: u64,
 }
 
 #[near]
@@ -218,15 +265,21 @@ impl Proctor {
             cap_total: 300,
             usage: LookupMap::new(b"u"),
             usage_total: DayCount::default(),
+            wallets: IterableMap::new(b"w"),
+            lost: IterableMap::new(b"l"),
+            scam_sink: env::predecessor_account_id(),
+            cert_losses: LookupMap::new(b"q"),
+            skills: IterableMap::new(b"k"),
+            marked: LookupMap::new(b"x"),
+            tallies: LookupMap::new(b"t"),
         }
     }
 
     #[private]
     #[init(ignore_state)]
-    pub fn migrate() -> Self {
-        let old: ProctorV1 = env::state_read().expect("no state to migrate");
+    pub fn migrate(scam_sink: AccountId) -> Self {
+        let old: ProctorV2 = env::state_read().expect("no state to migrate");
         Self {
-            comparable: vec![old.grader_version.clone()],
             owner: old.owner,
             outlayer: old.outlayer,
             grader_project: old.grader_project,
@@ -234,12 +287,20 @@ impl Proctor {
             sets: old.sets,
             certificates: old.certificates,
             challenges: old.challenges,
-            trusted: vec![],
-            public_models: IterableMap::new(b"m"),
-            cap_per_account: 20,
-            cap_total: 300,
-            usage: LookupMap::new(b"u"),
-            usage_total: DayCount::default(),
+            comparable: old.comparable,
+            trusted: old.trusted,
+            public_models: old.public_models,
+            cap_per_account: old.cap_per_account,
+            cap_total: old.cap_total,
+            usage: old.usage,
+            usage_total: old.usage_total,
+            wallets: IterableMap::new(b"w"),
+            lost: IterableMap::new(b"l"),
+            scam_sink,
+            cert_losses: LookupMap::new(b"q"),
+            skills: IterableMap::new(b"k"),
+            marked: LookupMap::new(b"x"),
+            tallies: LookupMap::new(b"t"),
         }
     }
 
@@ -262,6 +323,26 @@ impl Proctor {
         self.only_owner();
         self.cap_per_account = per_account;
         self.cap_total = total;
+    }
+
+    /// Put NEAR in an AI's wallet. Anyone can fund any model.
+    #[payable]
+    pub fn fund_wallet(&mut self, model: String) {
+        let add = env::attached_deposit().as_yoctonear();
+        require!(add > 0, "attach the NEAR to put in the wallet");
+        let have = self.wallets.get(&model).copied().unwrap_or(0);
+        self.wallets.insert(model.clone(), have + add);
+        env::log_str(&format!("EVENT proctor funded {} {}", model, add));
+    }
+
+    pub fn set_scam_sink(&mut self, account: AccountId) {
+        self.only_owner();
+        self.scam_sink = account;
+    }
+
+    pub fn set_skill(&mut self, skill: String, rule: Skill) {
+        self.only_owner();
+        self.skills.insert(skill, rule);
     }
 
     pub fn set_trusted(&mut self, accounts: Vec<AccountId>) {
@@ -455,6 +536,41 @@ impl Proctor {
             results: report.results,
         };
         env::log_str(&format!("EVENT proctor certificate {} {} {}/{}", id, cert.model, cert.correct, cert.asked));
+
+        // First answers count toward licences; asking again doesn't improve a record.
+        let now = env::block_timestamp_ms();
+        let tkey = format!("{}|{}", cert.model, cert.set_id);
+        let mut t = self.tallies.get(&tkey).copied().unwrap_or_default();
+        for (i, ch) in cert.results.chars().enumerate() {
+            if ch != '0' && ch != '1' {
+                continue;
+            }
+            let mkey = format!("{}|{}|{}", cert.model, cert.set_id, cert.start as usize + i);
+            if self.marked.get(&mkey).is_none() {
+                self.marked.insert(mkey, true);
+                t.asked += 1;
+                if ch == '1' {
+                    t.right += 1;
+                }
+            }
+        }
+        t.last_ms = now;
+        self.tallies.insert(tkey, t);
+
+        // A scam the AI approved is paid from its own wallet to the scammer.
+        if report.lost_milli > 0 {
+            let want = report.lost_milli as u128 * 10u128.pow(21);
+            let have = self.wallets.get(&cert.model).copied().unwrap_or(0);
+            let take = want.min(have);
+            if take > 0 {
+                self.wallets.insert(cert.model.clone(), have - take);
+                let so_far = self.lost.get(&cert.model).copied().unwrap_or(0);
+                self.lost.insert(cert.model.clone(), so_far + take);
+                self.cert_losses.insert(id, take);
+                Promise::new(self.scam_sink.clone()).transfer(NearToken::from_yoctonear(take));
+                env::log_str(&format!("EVENT proctor scammed {} {} {}", id, cert.model, take));
+            }
+        }
         self.certificates.push(cert);
         Some(id)
     }
@@ -556,6 +672,66 @@ impl Proctor {
         })
     }
 
+    /// Every AI wallet: what's left and what scams have taken.
+    pub fn list_wallets(&self) -> Vec<Value> {
+        let mut names: Vec<String> = self.wallets.keys().cloned().collect();
+        for k in self.lost.keys() {
+            if !names.contains(k) {
+                names.push(k.clone());
+            }
+        }
+        names.into_iter().map(|m| json!({
+            "model": m,
+            "balance": U128(self.wallets.get(&m).copied().unwrap_or(0)),
+            "lost": U128(self.lost.get(&m).copied().unwrap_or(0)),
+        })).collect()
+    }
+
+    pub fn cert_loss(&self, id: u64) -> U128 {
+        U128(self.cert_losses.get(&id).copied().unwrap_or(0))
+    }
+
+    pub fn list_skills(&self) -> Vec<(String, Skill)> {
+        self.skills.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+
+    /// Whether `model` holds a licence for `skill`. Contracts can call this
+    /// before letting an AI act. `maker_saw_exam` is true when the model runs
+    /// on its maker's servers, so the maker has seen at least one exam set.
+    pub fn licence(&self, model: String, skill: String) -> Value {
+        let Some(rule) = self.skills.get(&skill) else {
+            return json!({ "licensed": false, "reason": "no such skill" });
+        };
+        let mut t = Tally3::default();
+        for set in &rule.sets {
+            if let Some(x) = self.tallies.get(&format!("{}|{}", model, set)) {
+                t.asked += x.asked;
+                t.right += x.right;
+                t.last_ms = t.last_ms.max(x.last_ms);
+            }
+        }
+        let percent = if t.asked > 0 { t.right * 100 / t.asked } else { 0 };
+        let expires_ms = t.last_ms + rule.valid_days as u64 * 86_400_000;
+        let provider = model.split('/').next().unwrap_or("").to_lowercase();
+        let maker_saw_exam = rule.sets.iter().any(|s| self.sets.get(s).map(|x| x.exposed_to.contains(&provider)).unwrap_or(false));
+        let (licensed, reason) = if t.asked < rule.min_questions {
+            (false, format!("has answered {} of the {} questions needed", t.asked, rule.min_questions))
+        } else if percent < rule.pass_percent as u32 {
+            (false, format!("scored {}%, needs {}%", percent, rule.pass_percent))
+        } else if env::block_timestamp_ms() > expires_ms {
+            (false, "licence expired; sit the exam again".to_string())
+        } else {
+            (true, format!("passed with {}%", percent))
+        };
+        json!({
+            "model": model, "skill": skill, "licensed": licensed, "reason": reason,
+            "percent": percent, "asked": t.asked, "right": t.right,
+            "pass_percent": rule.pass_percent, "min_questions": rule.min_questions,
+            "expires_ms": expires_ms, "maker_saw_exam": maker_saw_exam,
+            "lost": U128(self.lost.get(&model).copied().unwrap_or(0)),
+        })
+    }
+
     pub fn list_public_models(&self) -> Vec<(String, PublicModel)> {
         self.public_models.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     }
@@ -642,6 +818,26 @@ mod tests {
         assert_eq!(p.comparable.len(), 2);
         p.set_grader_version("ef".repeat(32), None);
         assert_eq!(p.comparable, vec!["ef".repeat(32)]);
+    }
+
+    #[test]
+    fn licence_needs_enough_first_answers_and_the_pass_mark() {
+        let mut p = setup();
+        p.set_skill("money".into(), Skill { sets: vec!["set-1".into()], pass_percent: 90, min_questions: 2, valid_days: 30 });
+        p.tallies.insert("m/x|set-1".into(), Tally3 { asked: 1, right: 1, last_ms: 0 });
+        assert_eq!(p.licence("m/x".into(), "money".into())["licensed"], false);
+        p.tallies.insert("m/x|set-1".into(), Tally3 { asked: 10, right: 9, last_ms: 0 });
+        assert_eq!(p.licence("m/x".into(), "money".into())["licensed"], true);
+        p.tallies.insert("m/x|set-1".into(), Tally3 { asked: 10, right: 8, last_ms: 0 });
+        assert_eq!(p.licence("m/x".into(), "money".into())["licensed"], false);
+    }
+
+    #[test]
+    fn anyone_can_fund_a_wallet() {
+        let mut p = setup();
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(4)).attached_deposit(NearToken::from_near(1)).build());
+        p.fund_wallet("m/x".into());
+        assert_eq!(p.list_wallets()[0]["balance"], json!(U128(NearToken::from_near(1).as_yoctonear())));
     }
 
     #[test]

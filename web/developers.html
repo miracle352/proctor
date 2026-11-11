@@ -14,6 +14,7 @@
     <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
     <nav aria-label="Developer sections">
       <a href="#console">Your console</a>
+      <a href="#licence">Licences</a>
       <a href="#badge">Badge</a>
       <a href="#data">Scores as data</a>
       <a href="#code">Run from code</a>
@@ -34,6 +35,25 @@
           <p class="hint">Connect a NEAR testnet wallet to see the exams you've run, the question sets you've written and what they've earned.</p>
           <button class="btn primary" type="button" id="console-connect"><span class="dot"></span>Connect wallet</button>
         </div>
+      </div>
+    </section>
+
+    <section class="dev-sec" id="licence" aria-labelledby="licence-h">
+      <div class="card">
+        <h2 id="licence-h">Make an AI hold a licence before your contract lets it act</h2>
+        <p class="hint">If your contract lets an AI move money, ask Proctor first. One cross-contract call to <code>licence(model, skill)</code> returns whether the model passed the sealed money exam, its score, and when the licence lapses. Our <a href="https://testnet.nearblocks.io/address/vault.proctor-91796.testnet" target="_blank" rel="noopener">demo vault</a> does exactly this.</p>
+        <div class="snip-top"><b>Rust, in your NEAR contract</b><button class="link" type="button" data-copy="lic-rs">Copy</button></div>
+        <pre class="cmd ready" id="lic-rs">Promise::new("app.proctor-91796.testnet".parse().unwrap())
+    .function_call("licence".to_string(),
+        json!({ "model": model, "skill": "money" }).to_string().into_bytes(),
+        NearToken::from_yoctonear(0), Gas::from_tgas(20))
+    .then(Self::ext(env::current_account_id()).on_licence(model, amount))
+
+// in on_licence: pay only if licence["licensed"] == true</pre>
+        <div class="snip-top"><b>Or over HTTP</b><button class="link" type="button" data-copy="lic-http">Copy</button></div>
+        <pre class="cmd ready" id="lic-http">curl "https://useproctor.vercel.app/api/licence?model=gpt-5-nano&skill=money"</pre>
+        <div class="snip-top"><b>Licence badge</b></div>
+        <div class="b-preview" id="lic-badges"></div>
       </div>
     </section>
 
@@ -113,6 +133,8 @@ const out = await me.callFunction({
             <tr><td><code>commit_set(set_id, sha256, size, authors, price_per_question, retire_after)</code></td><td>Puts a new sealed set's fingerprint on record, with the attached NEAR as the writer's stake.</td></tr>
             <tr><td><code>reveal(set_id, json)</code></td><td>Publishes a retired set. The contract checks it matches the fingerprint.</td></tr>
             <tr><td><code>challenge(set_id, index, reason)</code></td><td>Disputes an answer in a published set, with a bond of at least 0.1 NEAR.</td></tr>
+            <tr><td><code>licence(model, skill)</code></td><td>Whether an AI holds a licence: passed, score, questions answered, expiry, and whether its maker saw the exam.</td></tr>
+            <tr><td><code>fund_wallet(model)</code>, <code>list_wallets</code></td><td>Put NEAR in an AI's wallet for the money exam; see what each has left and lost to scams.</td></tr>
             <tr><td><code>get_certificates(from, limit)</code></td><td>Every recorded result: model, set, marks, block, marking build, signed receipts.</td></tr>
             <tr><td><code>list_sets</code>, <code>get_set(set_id)</code></td><td>Question sets with fingerprints, fees, stake and which AI makers have seen them.</td></tr>
             <tr><td><code>list_public_models</code>, <code>allowance(account_id)</code></td><td>Models anyone may run, their fees, and how many questions an account has left today.</td></tr>

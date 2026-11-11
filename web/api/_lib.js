@@ -3,7 +3,7 @@
 export const CONTRACT = "app.proctor-91796.testnet";
 const RPC = "https://rpc.testnet.fastnear.com";
 
-async function view(method, args = {}) {
+export async function view(method, args = {}) {
   const res = await fetch(RPC, {
     method: "POST",
     headers: { "content-type": "application/json" },

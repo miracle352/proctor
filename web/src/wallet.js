@@ -43,10 +43,10 @@ const call = (methodName, args, deposit, gas = "300000000000000") => ({
 
 // Sends one transaction per call. Browser wallets (MyNearWallet) leave the
 // page and come back with ?transactionHashes=…; the others resolve here.
-export async function send(calls, callbackUrl) {
+export async function send(calls, callbackUrl, receiverId = CONTRACT) {
   const w = await selector.wallet();
   const transactions = calls.map(([method, args, deposit, gas]) => ({
-    signerId: current, receiverId: CONTRACT, actions: [internalActionToNaj(call(method, args, deposit, gas))],
+    signerId: current, receiverId, actions: [internalActionToNaj(call(method, args, deposit, gas))],
   }));
   const out = await w.signAndSendTransactions({ transactions, callbackUrl });
   return (out || []).map((o) => o?.transaction?.hash || o?.transaction_outcome?.id).filter(Boolean);

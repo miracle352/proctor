@@ -1,6 +1,8 @@
 // Reads come straight from the contract on NEAR testnet. No server, no cache.
 
 export const CONTRACT = "app.proctor-91796.testnet";
+export const VAULT = "vault.proctor-91796.testnet";
+export const SCAMMER = "scammer.proctor-91796.testnet";
 export const NETWORK = "testnet";
 export const RPC = "https://rpc.testnet.fastnear.com";
 export const EXPLORER = "https://testnet.nearblocks.io";
@@ -68,12 +70,14 @@ export function setLabel(id) {
   if (id.includes("-original-")) return `Published school maths, part ${part}`;
   if (id.includes("-twin-")) return `Rewritten school maths, part ${part}`;
   if (id.startsWith("hard-")) return `Harder maths, part ${part}`;
+  if (id.startsWith("money-")) return `Money exam, part ${part}`;
   if (id === "spike-1") return "Pilot set";
   return id;
 }
 export const isTwin = (id) => id.includes("-twin-");
 export const isOriginal = (id) => id.includes("-original-");
 export const isHard = (id) => id.startsWith("hard-");
+export const isMoney = (id) => id.startsWith("money-");
 
 function mulberry(seed) {
   return () => {
@@ -101,11 +105,13 @@ function gap(orig, twin) {
 }
 
 export async function load() {
-  const [config, setList, every, pub] = await Promise.all([
+  const [config, setList, every, pub, wallets, vaultTries] = await Promise.all([
     view("config"),
     view("list_sets", { from: 0, limit: 200 }),
     paged("get_certificates"),
     view("list_public_models").catch(() => []),
+    view("list_wallets").catch(() => []),
+    view("attempts", { from: 0, limit: 200 }, VAULT).catch(() => []),
   ]);
   const sets = Object.fromEntries(setList);
   const comparable = config.comparable || [config.grader_version];
@@ -140,6 +146,7 @@ export async function load() {
     const n = (o) => Object.keys(o).length;
     const hard = Object.entries(bySet).filter(([sid]) => isHard(sid)).flatMap(([, r]) => Object.values(r));
     const sealedAll = Object.entries(bySet).filter(([sid]) => isTwin(sid) || isHard(sid)).flatMap(([, r]) => Object.values(r));
+    const money = Object.entries(bySet).filter(([sid]) => isMoney(sid)).flatMap(([, r]) => Object.values(r));
     return {
       model, sealed: sealedBy[model], perSet,
       asked: perSet.reduce((a, s) => a + s.asked, 0),
@@ -149,13 +156,21 @@ export async function load() {
       gap: gap(fam.o, fam.t),
       hard: hard.length ? sum(hard) / hard.length : null, hardN: hard.length,
       sealedScore: sealedAll.length ? sum(sealedAll) / sealedAll.length : null, sealedN: sealedAll.length,
+      money: money.length ? sum(money) / money.length : null, moneyN: money.length,
     };
   }).sort((a, b) => (Math.min(b.sealedN, 60) - Math.min(a.sealedN, 60)) || ((b.sealedScore ?? 0) - (a.sealedScore ?? 0)) || (b.sealed - a.sealed));
 
   const paid = certs.reduce((a, c) => a + BigInt(c.paid_to_authors), 0n);
+  // what each wrongly answered money question cost, for the feed of scams paid
+  const lossIds = certs.filter((c) => isMoney(c.set_id) && c.results.includes("0")).map((c) => c.id);
+  const losses = Object.fromEntries((await Promise.all(lossIds.map(async (id) => [id, BigInt(await view("cert_loss", { id }).catch(() => "0"))])))
+    .filter(([, v]) => v > 0n));
+  const licences = Object.fromEntries(await Promise.all(wallets.map(async (w) =>
+    [w.model, await view("licence", { model: w.model, skill: "money" }).catch(() => null)])));
   return {
     config, sets, every, certs, models, paid,
     publicModels: Object.fromEntries(pub),
+    wallets, licences, vaultTries, losses,
     newest: every.slice().sort((a, b) => b.block_height - a.block_height),
   };
 }
