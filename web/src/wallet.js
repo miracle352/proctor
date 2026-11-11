@@ -1,6 +1,6 @@
 // NEAR wallet connection through the standard wallet selector, on testnet.
 import "./polyfill.js";
-import { setupWalletSelector } from "@near-wallet-selector/core";
+import { setupWalletSelector, internalActionToNaj } from "@near-wallet-selector/core";
 import { setupModal } from "@near-wallet-selector/modal-ui";
 import "@near-wallet-selector/modal-ui/styles.css";
 import { setupMyNearWallet } from "@near-wallet-selector/my-near-wallet";
@@ -46,7 +46,7 @@ const call = (methodName, args, deposit, gas = "300000000000000") => ({
 export async function send(calls, callbackUrl) {
   const w = await selector.wallet();
   const transactions = calls.map(([method, args, deposit, gas]) => ({
-    signerId: current, receiverId: CONTRACT, actions: [call(method, args, deposit, gas)],
+    signerId: current, receiverId: CONTRACT, actions: [internalActionToNaj(call(method, args, deposit, gas))],
   }));
   const out = await w.signAndSendTransactions({ transactions, callbackUrl });
   return (out || []).map((o) => o?.transaction?.hash || o?.transaction_outcome?.id).filter(Boolean);
