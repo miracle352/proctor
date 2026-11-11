@@ -51,3 +51,14 @@ export async function send(calls, callbackUrl, receiverId = CONTRACT) {
   const out = await w.signAndSendTransactions({ transactions, callbackUrl });
   return (out || []).map((o) => o?.transaction?.hash || o?.transaction_outcome?.id).filter(Boolean);
 }
+
+// Transactions to more than one contract, signed together: [[receiverId, calls], …].
+export async function sendTo(groups, callbackUrl) {
+  const w = await selector.wallet();
+  const transactions = groups.map(([receiverId, calls]) => ({
+    signerId: current, receiverId,
+    actions: calls.map(([method, args, deposit, gas]) => internalActionToNaj(call(method, args, deposit, gas))),
+  }));
+  const out = await w.signAndSendTransactions({ transactions, callbackUrl });
+  return (out || []).map((o) => o?.transaction?.hash || o?.transaction_outcome?.id).filter(Boolean);
+}

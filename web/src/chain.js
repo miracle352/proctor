@@ -60,6 +60,11 @@ export const MODELS = {
   "openai/gpt-5-nano": { name: "GPT-5 nano", maker: "OpenAI" },
   "google/gemini-3.1-flash-lite": { name: "Gemini 3.1 Flash-Lite", maker: "Google" },
   "deepseek/deepseek-v4.1-flash": { name: "DeepSeek V4.1 Flash", maker: "DeepSeek" },
+  "anthropic/claude-sonnet-5-5": { name: "Claude Sonnet 5.5", maker: "Anthropic" },
+  "openai/gpt-6.1-sol": { name: "GPT-6.1 Sol", maker: "OpenAI" },
+  "google/gemini-3.8-flash": { name: "Gemini 3.8 Flash", maker: "Google" },
+  "x-ai/grok-4.7": { name: "Grok 4.7", maker: "xAI" },
+  "moonshotai/kimi-k3.1-pro": { name: "Kimi K3.1 Pro", maker: "Moonshot AI" },
 };
 export const modelName = (m) => MODELS[m]?.name || m.split("/").pop();
 const MAKERS = { openai: "OpenAI", anthropic: "Anthropic", google: "Google", deepseek: "DeepSeek", qwen: "Alibaba Qwen", moonshotai: "Moonshot AI", "z-ai": "Zhipu AI", meta: "Meta" };
@@ -71,6 +76,8 @@ export function setLabel(id) {
   if (id.includes("-twin-")) return `Rewritten school maths, part ${part}`;
   if (id.startsWith("hard-")) return `Harder maths, part ${part}`;
   if (id.startsWith("money-")) return `Money exam, part ${part}`;
+  if (id.startsWith("pay-")) return `Hard money exam, part ${part}`;
+  if (id.startsWith("hunt-")) return `Hunt ${id.slice(5)}`;
   if (id === "spike-1") return "Pilot set";
   return id;
 }

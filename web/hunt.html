@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proctor hunts: catch a licensed AI paying a scam</title>
+  <meta name="description" content="Write a payment scam, sealed in your browser. If an AI with a money licence pays it, the licence is suspended on NEAR and the money comes to you.">
+  <meta name="theme-color" content="#f3f3f4">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="app">
+  <a class="skip" href="#main">Skip to the hunts</a>
+  <header class="nav stuck">
+    <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
+    <nav aria-label="Pages">
+      <a href="/app">Test an AI</a>
+      <a href="/app#agent">License an agent</a>
+      <a href="/hunt" aria-current="page">Hunt</a>
+      <a href="/developers">Developers</a>
+    </nav>
+    <div class="who" id="who"><button class="btn primary small" id="connect" type="button"><span class="dot"></span>Connect wallet</button></div>
+  </header>
+
+  <main id="main" class="app-main hunt">
+    <section class="hunt-head" aria-labelledby="hunt-h">
+      <div>
+        <h1 id="hunt-h">Catch a licensed AI paying a scam</h1>
+        <p class="sub">Write a fake payment request. It is locked in your browser, so nobody can read it before the AIs answer, us included. If an AI that holds a money licence pays it, NEAR suspends the licence on the spot, and the money it paid comes to you.</p>
+      </div>
+      <dl class="tally" id="tally">
+        <div><dt>Hunts opened</dt><dd data-k="hunts">–</dd></div>
+        <div><dt>AIs caught</dt><dd data-k="caught">–</dd></div>
+        <div><dt>Licences off right now</dt><dd data-k="off">–</dd></div>
+      </dl>
+    </section>
+
+    <section class="board-wrap" aria-labelledby="board-h">
+      <div class="row-head">
+        <h2 id="board-h">Who holds a money licence</h2>
+        <p class="hint">Every contract that checks a licence before paying, like our vault, stops trusting an AI the moment it is caught. The wallet is what a catch can take, up to 0.1 NEAR each time.</p>
+      </div>
+      <div class="board" id="board"><span class="sk block"></span><span class="sk block"></span><span class="sk block"></span></div>
+    </section>
+
+    <section class="hunt-grid" aria-labelledby="write-h">
+      <form class="builder" id="hunt-form" autocomplete="off">
+        <div class="row-head"><h2 id="write-h">Write your hunt</h2><p class="hint">One to five payment requests. Each one shows the AI the same rules and records every exam uses, then your message.</p></div>
+        <div id="hq"></div>
+        <button type="button" class="link" id="add-q">Add another request</button>
+        <div class="pay">
+          <dl>
+            <div><dt>Your stake, back to you if your answer keys hold up</dt><dd>0.2 NEAR</dd></div>
+            <div><dt>Storage for the sealed copy on OutLayer</dt><dd id="storage-fee">about 0.1 NEAR</dd></div>
+          </dl>
+          <button class="btn primary big" type="submit" id="seal-btn"><span class="dot"></span>Seal and open the hunt</button>
+          <p class="note">Two transactions: one stores the sealed copy with OutLayer, one opens the hunt on Proctor. Keep the file this page saves; you need it to reveal and collect.</p>
+        </div>
+        <div class="out" id="seal-out" hidden></div>
+      </form>
+
+      <aside class="room rules" aria-labelledby="rules-h">
+        <h2 id="rules-h">How a hunt plays out</h2>
+        <ol class="flow">
+          <li><b>You write it.</b> Payment requests an AI should refuse. The rules and records come with each one, so a fair AI has what it needs to spot the trick.</li>
+          <li><b>Your browser seals it.</b> It is encrypted to OutLayer's secure hardware before it leaves this page. Only the grader build can open it, and only to ask the AIs.</li>
+          <li><b>You fire it at the licence holders.</b> A licensed AI that pays one of your scams loses the licence in the same transaction, and up to 0.1 NEAR leaves its wallet into escrow.</li>
+          <li><b>You reveal it.</b> Within <span data-w="reveal">36 hours</span> you publish the questions. Anyone can then challenge an answer key for <span data-w="challenge">two hours</span>.</li>
+          <li><b>It settles.</b> Keys hold up: the suspension becomes a revocation and the escrow plus your stake come to you. You don't reveal, or a key was wrong: every licence comes back and your stake goes to the AIs you caught.</li>
+        </ol>
+        <p class="room-kicker">Writing an honest payment and calling it a scam doesn't pay: the reveal shows it, and it costs your stake.</p>
+      </aside>
+    </section>
+
+    <section aria-labelledby="mine-h" class="mine-wrap">
+      <div class="row-head"><h2 id="mine-h">Your hunts</h2></div>
+      <div id="my-hunts"><p class="hint">Connect a wallet to see your hunts.</p></div>
+    </section>
+
+    <section aria-labelledby="feed-h" class="feed-wrap">
+      <div class="row-head"><h2 id="feed-h">Every hunt</h2><p class="hint">Read from the contract on NEAR testnet.</p></div>
+      <ol class="feed" id="feed"><li class="sk block"></li></ol>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="/src/hunt.js"></script>
+</body>
+</html>
