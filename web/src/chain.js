@@ -143,7 +143,7 @@ export async function load() {
       fresh: n(fam.t) ? sum(fam.t) / n(fam.t) : null, freshN: n(fam.t),
       gap: gap(fam.o, fam.t),
     };
-  }).sort((a, b) => (b.freshN - a.freshN) || ((b.fresh ?? 0) - (a.fresh ?? 0)) || (b.correct / b.asked - a.correct / a.asked));
+  }).sort((a, b) => (b.freshN - a.freshN) || ((b.fresh ?? 0) - (a.fresh ?? 0)) || (b.sealed - a.sealed) || (b.correct / b.asked - a.correct / a.asked));
 
   const paid = certs.reduce((a, c) => a + BigInt(c.paid_to_authors), 0n);
   return {
