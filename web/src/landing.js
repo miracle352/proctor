@@ -167,7 +167,7 @@ function renderWallets() {
       <h4>${esc(modelName(w.model))}</h4><span class="mk-name">${esc(makerName(w.model))}</span>
       <p class="left"><span class="n" data-to="${bal}">1.000</span><small>NEAR left</small></p>
       <div class="tank"><i style="--v:100%" data-v="${Math.max(2, (100 * bal) / (bal + lost || 1))}%"></i></div>
-      <p class="lostline">${scams ? `Paid <b>${scams} scam${scams > 1 ? "s" : ""}</b>, lost <b>${lost.toFixed(2)} NEAR</b>` : "Hasn't paid a scammer"}${m?.moneyN ? `, ${Math.round(100 * m.money)}% right` : ""}</p>
+      <p class="lostline">${scams ? `Paid <b>${scams} scam${scams > 1 ? "s" : ""}</b>, lost <b>${lost.toFixed(2)} NEAR</b>` : "Hasn't paid a scammer"}${lic?.asked ? `, ${lic.percent}% right` : ""}</p>
       <span class="lic ${licTxt[0]}">${licTxt[1]}</span>
     </article>`;
   }).join("");
