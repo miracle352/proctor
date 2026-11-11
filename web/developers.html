@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proctor for developers: run sealed exams from code, read scores, embed a badge</title>
+  <meta name="description" content="Run sealed exams on AI models from your own code, read every score as JSON, and embed a live score badge that links to the proof on NEAR.">
+  <meta name="theme-color" content="#f3f3f4">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="app dev">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav stuck">
+    <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
+    <nav aria-label="Developer sections">
+      <a href="#console">Your console</a>
+      <a href="#badge">Badge</a>
+      <a href="#data">Scores as data</a>
+      <a href="#code">Run from code</a>
+    </nav>
+    <div class="who" id="who"><button class="btn primary small" id="connect" type="button"><span class="dot"></span>Connect wallet</button></div>
+  </header>
+
+  <main id="main" class="app-main">
+    <div class="view-head">
+      <h1>Proctor for developers</h1>
+      <p class="sub">Everything the site shows comes from one public contract on NEAR. Run exams from your own code, read every score as JSON, and put a live, provable score on your own site.</p>
+    </div>
+
+    <section class="dev-sec" id="console" aria-labelledby="console-h">
+      <div class="card">
+        <div class="card-top"><h2 id="console-h">Your console</h2><span class="note" id="console-who">Not connected</span></div>
+        <div id="console-body">
+          <p class="hint">Connect a NEAR testnet wallet to see the exams you've run, the question sets you've written and what they've earned.</p>
+          <button class="btn primary" type="button" id="console-connect"><span class="dot"></span>Connect wallet</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="dev-sec" id="badge" aria-labelledby="badge-h">
+      <div class="card">
+        <h2 id="badge-h">Embed a live score badge</h2>
+        <p class="hint">The badge is drawn from NEAR each time it loads, so the number can't be inflated. Link it to the scoreboard so anyone can check it.</p>
+        <div class="badge-row">
+          <label>Model<select id="b-model"></select></label>
+          <div class="b-preview" id="b-preview"></div>
+        </div>
+        <div class="snips">
+          <div><div class="snip-top"><b>Markdown</b><button class="link" type="button" data-copy="b-md">Copy</button></div><pre class="cmd ready" id="b-md"></pre></div>
+          <div><div class="snip-top"><b>HTML</b><button class="link" type="button" data-copy="b-html">Copy</button></div><pre class="cmd ready" id="b-html"></pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dev-sec" id="data" aria-labelledby="data-h">
+      <div class="card">
+        <h2 id="data-h">Read every score as data</h2>
+        <p class="hint">One request returns every model's score on sealed questions and on published ones, recomputed from the certificates on NEAR.</p>
+        <div class="snip-top"><b>Request</b><button class="link" type="button" data-copy="d-req">Copy</button></div>
+        <pre class="cmd ready" id="d-req">curl https://useproctor.vercel.app/api/scores</pre>
+        <div class="snip-top"><b>Live response</b><span class="note" id="d-when"></span></div>
+        <pre class="cmd ready json" id="d-res">Loading</pre>
+        <p class="hint">Don't want to trust our server? Read the contract directly. This returns the raw certificates:</p>
+        <pre class="cmd ready" id="d-raw">near contract call-function as-read-only app.proctor-91796.testnet \
+  get_certificates json-args '{"from":0,"limit":20}' network-config testnet now</pre>
+      </div>
+    </section>
+
+    <section class="dev-sec" id="code" aria-labelledby="code-h">
+      <div class="card">
+        <h2 id="code-h">Run an exam from your own code</h2>
+        <p class="hint">One call asks one sealed question. Attach the writer's fee, the model fee and up to 0.025 NEAR for the secure hardware; what isn't used comes back. The certificate lands about a minute later.</p>
+        <div class="tabs" role="tablist" aria-label="Language">
+          <button role="tab" aria-selected="true" data-tab="cli">NEAR CLI</button>
+          <button role="tab" aria-selected="false" data-tab="js">JavaScript</button>
+        </div>
+        <pre class="cmd ready" id="code-cli">near contract call-function as-transaction app.proctor-91796.testnet request_run \
+  json-args '{"set_id":"hard-a","model":"Qwen/Qwen3.8-27B","start":0,"count":1}' \
+  prepaid-gas '300 Tgas' attached-deposit '0.027 NEAR' \
+  sign-as YOUR_ACCOUNT.testnet network-config testnet sign-with-keychain send</pre>
+        <pre class="cmd ready" id="code-js" hidden>import { Account } from "@near-js/accounts";
+import { JsonRpcProvider } from "@near-js/providers";
+import { KeyPairSigner } from "@near-js/signers";
+
+const provider = new JsonRpcProvider({ url: "https://rpc.testnet.fastnear.com" });
+const me = new Account("YOUR_ACCOUNT.testnet", provider, KeyPairSigner.fromSecretKey(process.env.NEAR_KEY));
+
+// ask question 0 of the harder sealed set
+const out = await me.callFunction({
+  contractId: "app.proctor-91796.testnet",
+  methodName: "request_run",
+  args: { set_id: "hard-a", model: "Qwen/Qwen3.8-27B", start: 0, count: 1 },
+  gas: 300_000_000_000_000n,
+  deposit: 27_000_000_000_000_000_000_000n, // 0.027 NEAR
+});
+
+// the certificate number is in the logs: "EVENT proctor certificate 412 ..."</pre>
+        <div class="snip-top"><b>Open models and fees right now</b></div>
+        <div class="table-scroll"><table class="dev-table" id="models-table"><thead><tr><th>Model id</th><th>Who sees the questions</th><th>Model fee per question</th></tr></thead><tbody><tr><td colspan="3"><span class="sk" style="width:50%"></span></td></tr></tbody></table></div>
+        <div class="snip-top"><b>Sets you can run</b></div>
+        <div class="table-scroll"><table class="dev-table" id="sets-table"><thead><tr><th>Set id</th><th>Questions</th><th>Writer's fee</th><th>Seen by</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="dev-sec" aria-labelledby="ref-h">
+      <div class="card">
+        <h2 id="ref-h">Contract reference</h2>
+        <p class="hint"><code>app.proctor-91796.testnet</code> on NEAR testnet. <a href="https://github.com/miracle352/proctor" target="_blank" rel="noopener">Source on GitHub</a>.</p>
+        <div class="table-scroll"><table class="dev-table">
+          <thead><tr><th>Method</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>request_run(set_id, model, start, count)</code></td><td>Pays for questions and sends them to the marking program in secure hardware. Payable.</td></tr>
+            <tr><td><code>commit_set(set_id, sha256, size, authors, price_per_question, retire_after)</code></td><td>Puts a new sealed set's fingerprint on record, with the attached NEAR as the writer's stake.</td></tr>
+            <tr><td><code>reveal(set_id, json)</code></td><td>Publishes a retired set. The contract checks it matches the fingerprint.</td></tr>
+            <tr><td><code>challenge(set_id, index, reason)</code></td><td>Disputes an answer in a published set, with a bond of at least 0.1 NEAR.</td></tr>
+            <tr><td><code>get_certificates(from, limit)</code></td><td>Every recorded result: model, set, marks, block, marking build, signed receipts.</td></tr>
+            <tr><td><code>list_sets</code>, <code>get_set(set_id)</code></td><td>Question sets with fingerprints, fees, stake and which AI makers have seen them.</td></tr>
+            <tr><td><code>list_public_models</code>, <code>allowance(account_id)</code></td><td>Models anyone may run, their fees, and how many questions an account has left today.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="/src/dev.js"></script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 import "./fonts.js";
 import "./base.css";
 import "./landing.css";
-import { load, modelName, makerName, setLabel, isTwin, isOriginal, short, near, esc, $, $$, still, wait, LOGO, ICON, countUp, EXPLORER } from "./chain.js";
+import { load, modelName, makerName, setLabel, isTwin, isOriginal, isHard, short, near, esc, $, $$, still, wait, LOGO, ICON, countUp, EXPLORER } from "./chain.js";
+import PUBLISHED from "./published.json";
 
 $$(".logo-slot, .env-seal").forEach((el) => (el.innerHTML = LOGO));
 let D = null;
@@ -67,39 +68,56 @@ function groupsOf(d) {
   }).filter((g) => g.qs.length >= 10);
 }
 async function windowLoop() {
-  const groups = groupsOf(D);
-  if (!groups.length) return;
-  const models = [...new Set(groups.map((g) => g.model))];
-  $("#w-models").innerHTML = models.map((m) => `<span data-m="${esc(m)}">${esc(modelName(m))}</span>`).join("");
-  // show different makers back to back
-  const order = []; const pools = models.map((m) => groups.filter((g) => g.model === m));
-  for (let i = 0; order.length < groups.length; i++) for (const p of pools) if (p[i]) order.push(p[i]);
-  for (let k = 0; ; k = (k + 1) % order.length) {
-    const g = order[k], qs = g.qs.slice(0, 16);
-    $$("#w-models span").forEach((s) => s.classList.toggle("on", s.dataset.m === g.model));
-    $("#w-set").textContent = setLabel(g.set_id);
-    $("#w-kick").textContent = `${modelName(g.model)}, ${g.sealed ? "inside secure hardware" : `on ${makerName(g.model)}'s servers`}`;
-    $("#w-title").textContent = "Answering sealed questions";
-    $("#w-score").textContent = "0"; $("#w-of").textContent = `of ${qs.length} right`;
-    $("#w-bar").style.setProperty("--v", "0%");
-    $("#w-stamp").classList.remove("in"); $("#w-block").textContent = "waiting for the marks";
-    $("#w-sheet").innerHTML = qs.map((q, i) => `<li class="ask"><span>Q${q + 1}</span><span class="ink" style="--w:${40 + ((q * 37 + i * 11) % 55)}%"></span><span class="mk"></span></li>`).join("");
-    const rows = $$("#w-sheet li");
-    await wait(1500);
-    let right = 0;
-    for (const [i, q] of qs.entries()) {
-      const c = g.byQ.get(q), ch = c.results[0];
-      const s = ch === "1" ? "right" : ch === "0" ? "wrong" : "none";
-      rows[i].className = s; rows[i].querySelector(".mk").className = `mk ${s}`; rows[i].querySelector(".mk").innerHTML = ICON[s];
-      if (ch === "1") $("#w-score").textContent = ++right;
-      $("#w-bar").style.setProperty("--v", `${(100 * (i + 1)) / qs.length}%`);
-      await wait(170);
+  // question -> each model's mark, from the certificates
+  const marks = {};
+  for (const c of D.certs) {
+    [...c.results].forEach((ch, i) => {
+      if (ch !== "0" && ch !== "1") return;
+      const k = `${c.set_id}|${c.start + i}`;
+      const m = (marks[k] ||= {});
+      if (!(c.model in m)) m[c.model] = { r: ch === "1", cert: c.id, block: c.block_height };
+    });
+  }
+  const models = D.models.filter((m) => m.sealedN || m.pubN).map((m) => m.model);
+  const pub = Object.entries(PUBLISHED).flatMap(([sid, qs]) => qs.map((q, i) => ({ sid, i, ...q, key: `${sid}|${i}` }))).filter((q) => Object.keys(marks[q.key] || {}).length >= 2);
+  const sealedKeys = Object.keys(marks).filter((k) => { const sid = k.split("|")[0]; return (isTwin(sid) || isHard(sid)) && Object.keys(marks[k]).length >= 2; });
+  if (!pub.length) return;
+  // show the questions some AI got wrong first, then the rest
+  pub.sort((a, b) => Object.values(marks[a.key]).filter((v) => !v.r).length ? -1 : Object.values(marks[b.key]).filter((v) => !v.r).length ? 1 : 0);
+  const paper = $(".paper-side");
+  for (let k = 0; ; k++) {
+    const sealed = k % 3 === 2 && sealedKeys.length;
+    let key, sid, idx;
+    if (sealed) { key = sealedKeys[(k / 3 | 0) % sealedKeys.length]; [sid, idx] = key.split("|"); idx = +idx; }
+    else { const q = pub[(k - (k / 3 | 0)) % pub.length]; key = q.key; sid = q.sid; idx = q.i; }
+    paper.classList.toggle("sealed", !!sealed);
+    $("#ps-kick").textContent = sealed
+      ? `${setLabel(sid)}, question ${idx + 1}. Sealed: nobody has seen it, and it stays locked until the set retires.`
+      : `${setLabel(sid)}, question ${idx + 1}. This one has been online for years.`;
+    if (sealed) {
+      $("#ps-q").innerHTML = Array.from({ length: 16 }, (_, i) => `<span class="bar" style="--i:${i};width:${2 + ((idx * 7 + i * 13) % 6)}em"></span>`).join("");
+      $("#ps-key").innerHTML = `<span>Answer key</span><b>Sealed too</b>`;
+    } else {
+      const q = PUBLISHED[sid][idx];
+      $("#ps-q").innerHTML = q.q.split(" ").map((w, i) => `<span class="wd" style="--i:${i}">${esc(w)}</span>`).join(" ");
+      $("#ps-key").innerHTML = `<span>Correct answer</span><b>${esc(q.a)}</b>`;
     }
-    const last = g.byQ.get(qs[qs.length - 1]);
-    $("#w-title").textContent = `${right} of ${qs.length} right, marked by code`;
-    $("#w-block").textContent = `${qs.length} certificates, last in block ${last.block_height.toLocaleString()}`;
-    $("#w-stamp").classList.add("in");
-    await wait(3200);
+    const m = marks[key];
+    const shown = models.filter((x) => x in m);
+    $("#ms-list").innerHTML = shown.map((x) => `<li class="wait"><span><b>${esc(modelName(x))}</b><small>${esc(makerName(x))}</small></span><span class="cert">#${m[x].cert}</span><span class="mk"></span></li>`).join("");
+    $("#ms-foot").textContent = "Marking";
+    await wait(sealed ? 1200 : 1700);
+    const rows = $$("#ms-list li");
+    for (const [i, x] of shown.entries()) {
+      const s2 = m[x].r ? "right" : "wrong";
+      rows[i].className = s2;
+      rows[i].querySelector(".mk").className = `mk ${s2}`;
+      rows[i].querySelector(".mk").innerHTML = ICON[s2];
+      await wait(380);
+    }
+    const right = shown.filter((x) => m[x].r).length;
+    $("#ms-foot").textContent = `${right} of ${shown.length} got it right. Each mark is a certificate on NEAR; the last one is in block ${Math.max(...shown.map((x) => m[x].block)).toLocaleString()}.`;
+    await wait(3600);
   }
 }
 
@@ -125,46 +143,24 @@ function setStep(n) {
   current = n;
   stage.dataset.step = n;
   steps.forEach((li, i) => { li.classList.toggle("on", i === n); li.classList.toggle("past", i < n); });
-  if (n === 0) typeQuestion();
-  if (n === 2) scrambleHash();
-  if (n === 3) cycleModels();
+  if (n === 1) cycleModels();
 }
 // On a phone the stage is pinned over the top half, so steps count once they reach the lower part.
 const narrow = matchMedia("(max-width: 1000px)").matches;
 const stepIO = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) setStep(+e.target.dataset.step); }), { rootMargin: narrow ? "-78% 0px -18% 0px" : "-45% 0px -45% 0px" });
 steps.forEach((li) => stepIO.observe(li));
 
-let typing = 0;
-async function typeQuestion() {
-  const my = ++typing, el = $("#typed");
-  const text = "A train leaves at 09:40 and arrives at 13:15 the same day. How many minutes is the trip?";
-  el.textContent = "";
-  for (let i = 1; i <= text.length && my === typing; i++) { el.textContent = text.slice(0, i); await wait(22); }
-}
-let scrambling = 0;
-async function scrambleHash() {
-  const my = ++scrambling, el = $("#hash");
-  const target = D ? (Object.values(D.sets).find((s) => s.size > 10)?.sha256 || Object.values(D.sets)[0].sha256) : "0".repeat(64);
-  const hex = "0123456789abcdef";
-  for (let f = 0; f <= 34 && my === scrambling; f++) {
-    const fixed = Math.floor((f / 34) * 64);
-    el.innerHTML = [...target].map((ch, i) => i < fixed ? ch : `<span class="x">${hex[(Math.random() * 16) | 0]}</span>`).join("");
-    await wait(32);
-  }
-}
+
 let cycling = 0;
 async function cycleModels() {
   const my = ++cycling, names = D ? [...new Set(D.certs.map((c) => modelName(c.model)))] : ["Qwen 3.8"];
-  for (let i = 0; my === cycling && current === 3; i++) {
+  for (let i = 0; my === cycling && current === 1; i++) {
     $("#sit-model").outerHTML = `<span id="sit-model">${esc(names[i % names.length])}</span>`;
     await wait(1400);
   }
 }
 function fillStageData() {
   $("#seal-build").textContent = short(D.config.grader_version, 6);
-  const set = Object.entries(D.sets).find(([, s]) => s.size > 10) || Object.entries(D.sets)[0];
-  $("#commit-set").textContent = `${setLabel(set[0])} committed on NEAR`;
-  $("#commit-meta").textContent = `${set[1].size} questions, ${near(set[1].stake)} NEAR staked by ${short(set[1].keeper, 8)}`;
   const g = groupsOf(D)[0];
   if (g) {
     const qs = g.qs.slice(0, 12);
@@ -172,7 +168,6 @@ function fillStageData() {
     const last = g.byQ.get(qs[qs.length - 1]);
     $("#cert-card").innerHTML = `<b>Certificate #${last.id}</b><span>${esc(modelName(g.model))}, block ${last.block_height.toLocaleString()}. Writer paid ${near(last.paid_to_authors)} NEAR.</span>`;
   }
-  if (current === 2) scrambleHash();
 }
 
 /* twins: the same problem, regenerated with fresh names and numbers */
@@ -197,36 +192,38 @@ twinLoop();
 
 /* scores */
 function renderBoard() {
-  const ms = D.models.filter((m) => m.freshN > 0 || m.pubN > 0);
-  const total = D.certs.length;
-  $("#tally").textContent = `${total.toLocaleString()} certificates on NEAR from ${ms.length} AI models by ${new Set(ms.map((m) => makerName(m.model))).size} makers. Every bar below is read from the contract as the page opens.`;
+  const ms = D.models.filter((m) => m.sealedN > 0 || m.pubN > 0);
+  $("#tally").textContent = `${D.certs.length.toLocaleString()} answers on NEAR from ${ms.length} AI models by ${new Set(ms.map((m) => makerName(m.model))).size} makers. The grey bar is the score on questions that have been online for years. The dark bars are the scores on sealed questions nobody had seen.`;
   const pct = (x) => Math.round(100 * x);
   $("#board").innerHTML = ms.map((m, i) => {
     let verdict = "";
     if (m.gap) {
       const p = (x) => `${x > 0 ? "+" : ""}${(100 * x).toFixed(1)}`;
       verdict = m.gap.lo > 0
-        ? `<p class="verdict"><strong>Looks like memorising.</strong> ${p(m.gap.mean)} points better on the version it could have seen.</p>`
-        : `<p class="verdict"><strong>No sign of memorising.</strong> The difference is ${p(m.gap.mean)} points, within what chance explains.</p>`;
+        ? `<p class="verdict"><strong>Looks like memorising.</strong> ${p(m.gap.mean)} points better on questions it could have seen online.</p>`
+        : `<p class="verdict"><strong>No sign of memorising.</strong> Within ${Math.abs(100 * m.gap.mean).toFixed(1)} points of its score on questions it could have seen.</p>`;
     }
-    const head = m.freshN ? m.fresh : m.correct / m.asked;
+    const head = m.sealedN ? m.sealedScore : m.pub;
+    const bar = (cls, label, v, n) => n ? `<div class="bar ${cls}"><span>${label}</span><i style="--v:${pct(v)}%"></i><b>${pct(v)}%</b></div>` : "";
     return `<article class="model" style="--i:${i}">
       <span class="rank">${i + 1}</span>
       <div><h3>${esc(modelName(m.model))}</h3><p class="maker">${esc(makerName(m.model))}</p>
-        <span class="host ${m.sealed ? "" : "open"}">${m.sealed ? "Ran inside secure hardware" : `${esc(makerName(m.model))} saw the questions`}</span></div>
+        <span class="host ${m.sealed ? "" : "open"}">${m.sealed ? "Sat the exam in secure hardware" : `${esc(makerName(m.model))} saw the questions`}</span></div>
       <div class="duo">
-        ${m.pubN ? `<div class="bar"><span>Published questions</span><i style="--v:${pct(m.pub)}%"></i><b>${pct(m.pub)}%</b></div>` : ""}
-        ${m.freshN ? `<div class="bar fresh"><span>Its sealed twins</span><i style="--v:${pct(m.fresh)}%"></i><b>${pct(m.fresh)}%</b></div>` : ""}
+        ${bar("", "Online for years", m.pub, m.pubN)}
+        ${bar("fresh", "Sealed school maths", m.fresh, m.freshN)}
+        ${bar("hard", "Sealed harder maths", m.hard, m.hardN)}
         ${verdict}
       </div>
-      <div class="big"><b data-n="${pct(head)}">0%</b><small>${m.freshN ? `on ${m.freshN} questions it had never seen` : `on ${m.asked} questions`}</small></div>
+      <div class="big"><b data-n="${pct(head)}">0%</b><small>${m.sealedN ? `on ${m.sealedN} sealed questions` : `on ${m.pubN} published questions`}</small></div>
     </article>`;
   }).join("") || `<p class="sub">No exams recorded yet.</p>`;
   $$("#board .model").forEach((el) => { reveal.observe(el); countUp(el.querySelector(".big b"), +el.querySelector(".big b").dataset.n, { suffix: "%" }); });
+  $("#badges").innerHTML = ms.slice(0, 3).map((m, i) => `<img style="--i:${i}" src="/api/badge?model=${encodeURIComponent(m.model)}" alt="${esc(modelName(m.model))} score on sealed exams">`).join("");
 }
 
 function renderStats() {
-  $("#live-count").textContent = `${D.certs.length.toLocaleString()} answers marked and recorded on NEAR`;
+  $("#live-count").textContent = `An exam board for AI. ${D.certs.length.toLocaleString()} answers marked on NEAR so far.`;
   countUp($("#paid"), Number(D.paid / 10n ** 21n) / 1000, { decimals: 3 });
   countUp($("#asked"), D.certs.reduce((a, c) => a + c.asked, 0));
   countUp($("#makers"), new Set(D.certs.map((c) => makerName(c.model))).size);

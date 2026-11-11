@@ -60,17 +60,20 @@ export const MODELS = {
   "deepseek/deepseek-v4.1-flash": { name: "DeepSeek V4.1 Flash", maker: "DeepSeek" },
 };
 export const modelName = (m) => MODELS[m]?.name || m.split("/").pop();
-export const makerName = (m) => MODELS[m]?.maker || m.split("/")[0].replace(/^./, (c) => c.toUpperCase());
+const MAKERS = { openai: "OpenAI", anthropic: "Anthropic", google: "Google", deepseek: "DeepSeek", qwen: "Alibaba Qwen", moonshotai: "Moonshot AI", "z-ai": "Zhipu AI", meta: "Meta" };
+export const makerName = (m) => MODELS[m]?.maker || MAKERS[m.split("/")[0].toLowerCase()] || m.split("/")[0].replace(/^./, (c) => c.toUpperCase());
 
 export function setLabel(id) {
   const part = id.split("-").pop().toUpperCase();
   if (id.includes("-original-")) return `Published school maths, part ${part}`;
   if (id.includes("-twin-")) return `Rewritten school maths, part ${part}`;
+  if (id.startsWith("hard-")) return `Harder maths, part ${part}`;
   if (id === "spike-1") return "Pilot set";
   return id;
 }
 export const isTwin = (id) => id.includes("-twin-");
 export const isOriginal = (id) => id.includes("-original-");
+export const isHard = (id) => id.startsWith("hard-");
 
 function mulberry(seed) {
   return () => {
@@ -135,6 +138,8 @@ export async function load() {
     }
     const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
     const n = (o) => Object.keys(o).length;
+    const hard = Object.entries(bySet).filter(([sid]) => isHard(sid)).flatMap(([, r]) => Object.values(r));
+    const sealedAll = Object.entries(bySet).filter(([sid]) => isTwin(sid) || isHard(sid)).flatMap(([, r]) => Object.values(r));
     return {
       model, sealed: sealedBy[model], perSet,
       asked: perSet.reduce((a, s) => a + s.asked, 0),
@@ -142,8 +147,10 @@ export async function load() {
       pub: n(fam.o) ? sum(fam.o) / n(fam.o) : null, pubN: n(fam.o),
       fresh: n(fam.t) ? sum(fam.t) / n(fam.t) : null, freshN: n(fam.t),
       gap: gap(fam.o, fam.t),
+      hard: hard.length ? sum(hard) / hard.length : null, hardN: hard.length,
+      sealedScore: sealedAll.length ? sum(sealedAll) / sealedAll.length : null, sealedN: sealedAll.length,
     };
-  }).sort((a, b) => (b.freshN - a.freshN) || ((b.fresh ?? 0) - (a.fresh ?? 0)) || (b.sealed - a.sealed) || (b.correct / b.asked - a.correct / a.asked));
+  }).sort((a, b) => (Math.min(b.sealedN, 60) - Math.min(a.sealedN, 60)) || ((b.sealedScore ?? 0) - (a.sealedScore ?? 0)) || (b.sealed - a.sealed));
 
   const paid = certs.reduce((a, c) => a + BigInt(c.paid_to_authors), 0n);
   return {
