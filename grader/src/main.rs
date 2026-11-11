@@ -25,7 +25,10 @@ fn default_count() -> usize {
     5
 }
 fn default_max_tokens() -> u32 {
-    2048
+    // A NEAR contract waits about 200 blocks (roughly two minutes on
+    // testnet) for OutLayer to answer. At ~33 tokens/s, 3000 tokens plus
+    // overhead fits; with low reasoning effort Qwen 3.8 answers in ~1500.
+    3000
 }
 
 const API: &str = "https://cloud-api.near.ai/v1";
@@ -38,9 +41,11 @@ const API: &str = "https://cloud-api.near.ai/v1";
 static OUTLAYER_MANIFEST: [u8; include_bytes!("../manifest.json").len()] = *include_bytes!("../manifest.json");
 
 fn fail(msg: &str) -> ! {
-    // stdout is what reaches the chain, so errors go there as JSON too.
+    // stdout is what reaches the chain, so errors go there as JSON too. Exit 0
+    // on purpose: OutLayer drops the output of a failed run, and then the
+    // contract cannot say why it refunded.
     println!("{}", serde_json::json!({ "error": msg }));
-    std::process::exit(1)
+    std::process::exit(0)
 }
 
 fn main() {
@@ -65,8 +70,10 @@ fn main() {
     let slice = set.items.get(input.start..end).unwrap_or(&[]);
     let mut report = Report::new(&set, set_sha256, &input.model, sealed, input.start, slice.len());
 
-    for item in slice {
-        match net::ask(&api_key, &input.model, &item.prompt, input.max_tokens) {
+    let prompts: Vec<&str> = slice.iter().map(|i| i.prompt.as_str()).collect();
+    let answers = net::ask_all(&api_key, &input.model, &prompts, input.max_tokens);
+    for (item, answer) in slice.iter().zip(answers) {
+        match answer {
             Ok((text, chat_id)) => report.record(&item.author, is_correct(&item.answer, &text), Some(chat_id)),
             Err(_) => report.record(&item.author, false, None),
         }
@@ -84,37 +91,43 @@ mod net {
     use std::time::Duration;
     use wasi_http_client::Client;
 
-    fn post(api_key: &str, path: &str, body: &Value) -> Result<Value, String> {
-        let resp = Client::new()
-            .post(&format!("{API}{path}"))
-            .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {api_key}"))
-            .connect_timeout(Duration::from_secs(20))
-            .body(body.to_string().as_bytes())
-            .send()
-            .map_err(|e| format!("{e:?}"))?;
-        let status = resp.status();
-        let bytes = resp.body().map_err(|e| format!("{e:?}"))?;
-        if !(200..300).contains(&status) {
-            return Err(format!("status {status}"));
-        }
-        serde_json::from_slice(&bytes).map_err(|e| e.to_string())
-    }
-
-    pub fn ask(api_key: &str, model: &str, prompt: &str, max_tokens: u32) -> Result<(String, String), String> {
-        let body = json!({
-            "model": model,
-            "messages": [
-                {"role": "system", "content": INSTRUCTION},
-                {"role": "user", "content": prompt}
-            ],
-            "max_tokens": max_tokens,
-            "temperature": 0
-        });
-        let v = post(api_key, "/chat/completions", &body)?;
-        let text = v["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
-        let id = v["id"].as_str().unwrap_or("").to_string();
-        Ok((text, id))
+    /// All prompts are sent at once; answers come back in the same order.
+    pub fn ask_all(api_key: &str, model: &str, prompts: &[&str], max_tokens: u32) -> Vec<Result<(String, String), String>> {
+        let bodies: Vec<Vec<u8>> = prompts
+            .iter()
+            .map(|p| {
+                json!({
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": INSTRUCTION},
+                        {"role": "user", "content": p}
+                    ],
+                    "max_tokens": max_tokens,
+                    "temperature": 0,
+                    // Same setting for every model, so scores are comparable.
+                    "reasoning_effort": "low"
+                })
+                .to_string()
+                .into_bytes()
+            })
+            .collect();
+        let posts: Vec<crate::conc::Post> = bodies
+            .into_iter()
+            .map(|body| crate::conc::Post { authority: "cloud-api.near.ai", path: "/v1/chat/completions", bearer: api_key, body })
+            .collect();
+        crate::conc::post_all(&posts, 150)
+            .into_iter()
+            .map(|r| {
+                let (status, bytes) = r?;
+                if !(200..300).contains(&status) {
+                    return Err(format!("status {status}"));
+                }
+                let v: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                let text = v["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
+                let id = v["id"].as_str().unwrap_or("").to_string();
+                Ok((text, id))
+            })
+            .collect()
     }
 
     pub fn model_is_verifiable(api_key: &str, model: &str) -> Result<bool, String> {
@@ -133,11 +146,14 @@ mod net {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+mod conc;
+
 // Native builds exist only so `cargo test` works on a laptop.
 #[cfg(not(target_arch = "wasm32"))]
 mod net {
-    pub fn ask(_: &str, _: &str, _: &str, _: u32) -> Result<(String, String), String> {
-        Err("network is only wired up in the wasm build".into())
+    pub fn ask_all(_: &str, _: &str, prompts: &[&str], _: u32) -> Vec<Result<(String, String), String>> {
+        prompts.iter().map(|_| Err("network is only wired up in the wasm build".into())).collect()
     }
     pub fn model_is_verifiable(_: &str, _: &str) -> Result<bool, String> {
         Ok(false)

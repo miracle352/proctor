@@ -20,6 +20,7 @@ hex = "0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasi-http-client = "0.2"
+wasi = "0.13"
 
 [profile.release]
 opt-level = "z"
