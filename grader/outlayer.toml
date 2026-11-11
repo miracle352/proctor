@@ -1,0 +1,5 @@
+network = "testnet"
+
+[project]
+name = "grader"
+owner = "proctor-91796.testnet"

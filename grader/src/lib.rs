@@ -108,6 +108,10 @@ pub struct Report {
     pub by_author: BTreeMap<String, Tally>,
     pub chat_ids: Vec<String>,
     pub failures: u32,
+    /// One character per question in slice order: 1 correct, 0 wrong,
+    /// x no answer. Says nothing about content, but once a set is revealed it
+    /// lets anyone drop a bad question and recompute every score.
+    pub results: String,
 }
 
 impl Report {
@@ -125,6 +129,7 @@ impl Report {
             by_author: BTreeMap::new(),
             chat_ids: Vec::new(),
             failures: 0,
+            results: String::new(),
         }
     }
 
@@ -139,8 +144,14 @@ impl Report {
             t.correct += 1;
         }
         match chat_id {
-            Some(id) => self.chat_ids.push(id),
-            None => self.failures += 1,
+            Some(id) => {
+                self.chat_ids.push(id);
+                self.results.push(if ok { '1' } else { '0' });
+            }
+            None => {
+                self.failures += 1;
+                self.results.push('x');
+            }
         }
     }
 }
@@ -190,5 +201,6 @@ mod tests {
         assert_eq!(r.correct, 2);
         assert_eq!(r.by_author["a"], Tally { asked: 2, correct: 1 });
         assert_eq!(r.failures, 1);
+        assert_eq!(r.results, "10x");
     }
 }

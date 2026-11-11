@@ -15,6 +15,7 @@ use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, Pani
 
 const CALLBACK_GAS: Gas = Gas::from_tgas(30);
 const MAX_SLICE: u32 = 10;
+const MIN_BOND: NearToken = NearToken::from_millinear(100);
 
 #[ext_contract(ext_outlayer)]
 #[allow(dead_code)]
@@ -47,6 +48,31 @@ pub struct SetInfo {
     pub revealed: bool,
     /// Providers that have seen this set's questions, e.g. "openai".
     pub exposed_to: Vec<String>,
+    /// Put up by the keeper at commit. Upheld challenges are paid from it.
+    pub stake: U128,
+    /// Question indexes whose answer key was successfully challenged.
+    pub faulty: Vec<u32>,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, PartialEq, Debug)]
+pub enum ChallengeStatus {
+    Open,
+    Upheld,
+    Rejected,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct Challenge {
+    pub id: u64,
+    pub set_id: String,
+    pub item_index: u32,
+    /// What the challenger says the right answer is, and why.
+    pub claim: String,
+    pub challenger: AccountId,
+    pub bond: U128,
+    pub status: ChallengeStatus,
 }
 
 #[near(serializers = [borsh, json])]
@@ -77,6 +103,8 @@ pub struct Certificate {
     pub requester: AccountId,
     pub paid_to_authors: U128,
     pub block_height: u64,
+    /// One character per question from `start`: 1 right, 0 wrong, x no answer.
+    pub results: String,
 }
 
 /// What the grader prints. Field names match grader/src/lib.rs.
@@ -93,6 +121,8 @@ struct Report {
     by_author: std::collections::BTreeMap<String, Tally>,
     chat_ids: Vec<String>,
     failures: u32,
+    #[serde(default)]
+    results: String,
 }
 
 #[derive(Deserialize)]
@@ -122,6 +152,7 @@ pub struct Proctor {
     grader_version: String,
     sets: IterableMap<String, SetInfo>,
     certificates: Vector<Certificate>,
+    challenges: Vector<Challenge>,
 }
 
 #[near]
@@ -135,6 +166,7 @@ impl Proctor {
             grader_version,
             sets: IterableMap::new(b"s"),
             certificates: Vector::new(b"c"),
+            challenges: Vector::new(b"h"),
         }
     }
 
@@ -146,7 +178,9 @@ impl Proctor {
     }
 
     /// Commit a set. Called by the keeper, the account whose OutLayer secret
-    /// row (profile = set_id) holds the sealed questions.
+    /// row (profile = set_id) holds the sealed questions. The attached deposit
+    /// is the keeper's stake behind the answer keys.
+    #[payable]
     pub fn commit_set(
         &mut self,
         set_id: String,
@@ -169,6 +203,8 @@ impl Proctor {
             retire_after: retire_after.max(1),
             revealed: false,
             exposed_to: vec![],
+            stake: U128(env::attached_deposit().as_yoctonear()),
+            faulty: vec![],
         };
         env::log_str(&format!("EVENT proctor commit {} {}", set_id, info.sha256));
         self.sets.insert(set_id, info);
@@ -301,6 +337,7 @@ impl Proctor {
             requester: run.requester,
             paid_to_authors: U128(paid),
             block_height: env::block_height(),
+            results: report.results,
         };
         env::log_str(&format!("EVENT proctor certificate {} {} {}/{}", id, cert.model, cert.correct, cert.asked));
         self.certificates.push(cert);
@@ -317,6 +354,59 @@ impl Proctor {
         set.revealed = true;
         self.sets.insert(set_id.clone(), set);
         env::log_str(&format!("EVENT proctor revealed {}", set_id));
+    }
+
+    /// Once a set is public, anyone can dispute one answer key. The bond is
+    /// lost to the keeper if the challenge fails.
+    #[payable]
+    pub fn challenge(&mut self, set_id: String, item_index: u32, claim: String) -> u64 {
+        let set = self.sets.get(&set_id).expect("no such set");
+        require!(set.revealed, "challenges open once the set is revealed");
+        require!(item_index < set.size, "no such question");
+        require!(!set.faulty.contains(&item_index), "already marked faulty");
+        require!(env::attached_deposit() >= MIN_BOND, "bond is at least 0.1 NEAR");
+        require!(!claim.is_empty() && claim.len() <= 2000, "claim must be 1..=2000 bytes");
+        let id = self.challenges.len() as u64;
+        self.challenges.push(Challenge {
+            id,
+            set_id,
+            item_index,
+            claim,
+            challenger: env::predecessor_account_id(),
+            bond: U128(env::attached_deposit().as_yoctonear()),
+            status: ChallengeStatus::Open,
+        });
+        env::log_str(&format!("EVENT proctor challenge {id}"));
+        id
+    }
+
+    /// Reviewed by the owner for now. Upheld: the challenger gets the bond
+    /// back plus one question's share of the stake, and the question is
+    /// dropped from adjusted scores. Rejected: the bond goes to the keeper.
+    pub fn resolve_challenge(&mut self, id: u64, upheld: bool) {
+        require!(env::predecessor_account_id() == self.owner, "owner only");
+        let mut c = self.challenges.get(id as u32).expect("no such challenge").clone();
+        require!(c.status == ChallengeStatus::Open, "already resolved");
+        let mut set = self.sets.get(&c.set_id).expect("no such set").clone();
+        if upheld {
+            let share = set.stake.0 / set.size as u128;
+            set.stake = U128(set.stake.0 - share);
+            set.faulty.push(c.item_index);
+            Promise::new(c.challenger.clone()).transfer(NearToken::from_yoctonear(c.bond.0 + share));
+            c.status = ChallengeStatus::Upheld;
+        } else {
+            Promise::new(set.keeper.clone()).transfer(NearToken::from_yoctonear(c.bond.0));
+            c.status = ChallengeStatus::Rejected;
+        }
+        env::log_str(&format!("EVENT proctor challenge_resolved {} {}", id, upheld));
+        self.sets.insert(c.set_id.clone(), set);
+        self.challenges.replace(id as u32, c);
+    }
+
+    pub fn get_challenges(&self, from: Option<u64>, limit: Option<u64>) -> Vec<Challenge> {
+        let from = from.unwrap_or(0);
+        let end = (from + limit.unwrap_or(50)).min(self.challenges.len() as u64);
+        (from..end).filter_map(|i| self.challenges.get(i as u32).cloned()).collect()
     }
 
     pub fn get_set(&self, set_id: String) -> Option<SetInfo> {
@@ -389,6 +479,40 @@ mod tests {
         let mut p = setup();
         commit(&mut p, "original");
         p.reveal("set-1".into(), "something else".into());
+    }
+
+    #[test]
+    fn upheld_challenge_marks_question_faulty() {
+        let mut p = setup();
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(accounts(0))
+            .attached_deposit(NearToken::from_near(1))
+            .build());
+        commit(&mut p, "x");
+        p.reveal("set-1".into(), "x".into());
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(NearToken::from_millinear(100))
+            .build());
+        let id = p.challenge("set-1".into(), 4, "key says 12, the working gives 14".into());
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).build());
+        p.resolve_challenge(id, true);
+        let set = p.get_set("set-1".into()).unwrap();
+        assert_eq!(set.faulty, vec![4]);
+        assert_eq!(set.stake.0, NearToken::from_near(1).as_yoctonear() * 9 / 10);
+        assert_eq!(p.get_challenges(None, None)[0].status, ChallengeStatus::Upheld);
+    }
+
+    #[test]
+    #[should_panic(expected = "challenges open once the set is revealed")]
+    fn no_challenges_while_sealed() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(NearToken::from_millinear(100))
+            .build());
+        p.challenge("set-1".into(), 0, "wrong".into());
     }
 
     #[test]

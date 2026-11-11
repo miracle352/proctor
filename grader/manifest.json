@@ -3,5 +3,6 @@
   "author_secrets": { "profile": "nearai" },
   "capabilities": {
     "network": [{ "host": "cloud-api.near.ai", "timeout_secs": 120 }]
-  }
+  },
+  "callers": { "contract": { "only": ["app.proctor-91796.testnet"] } }
 }
