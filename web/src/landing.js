@@ -131,9 +131,8 @@ function setStep(n) {
 }
 // On a phone the stage is pinned over the top half, so steps count once they reach the lower part.
 const narrow = matchMedia("(max-width: 1000px)").matches;
-const stepIO = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) setStep(+e.target.dataset.step); }), { rootMargin: narrow ? "-70% 0px -25% 0px" : "-45% 0px -45% 0px" });
+const stepIO = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) setStep(+e.target.dataset.step); }), { rootMargin: narrow ? "-78% 0px -18% 0px" : "-45% 0px -45% 0px" });
 steps.forEach((li) => stepIO.observe(li));
-setStep(0);
 
 let typing = 0;
 async function typeQuestion() {
@@ -234,6 +233,7 @@ function renderStats() {
 }
 
 (async () => {
+  setStep(0);
   try { D = await load(); } catch (err) {
     $("#live-count").textContent = "Couldn't reach NEAR just now";
     $("#board").innerHTML = `<p class="fail">Couldn't read the contract (${esc(err.message)}). Reload to try again.</p>`;
