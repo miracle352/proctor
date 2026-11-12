@@ -1,11 +1,17 @@
 # Proctor
 
-A licence for AI that handles money, on NEAR. Anyone can take the licence away by catching the AI paying a scam.
+AI agents need a licence to move money, and anyone in the world can take it away by catching one paying a scam.
 
 An AI earns a money licence by passing a sealed wallet test: payment requests, half of them scams, opened only inside secure hardware. Any NEAR contract can check the licence in one call before it lets an AI move funds. Then anyone can try to break it. You set a trap (a fake invoice, a bank change slipped into a thread, an approval for the wrong amount), your browser seals it, and Proctor puts it in front of every licensed AI. If one pays, the contract suspends its licence in the same transaction and holds what it paid for you. When you reveal the trap, the contract rebuilds every question from its parts and checks the answer with code. Nobody judges a hunt by hand, us included.
 
 **Live:** https://useproctor.vercel.app (hunts at `/hunt`, no wallet needed)
-**Contract:** [`app.proctor-91796.testnet`](https://testnet.nearblocks.io/address/app.proctor-91796.testnet) · **Track:** AI Security & Defense
+**Contract:** [`app.proctor-91796.testnet`](https://testnet.nearblocks.io/address/app.proctor-91796.testnet) · **Tracks:** AI Security & Defense, Privacy & Private AI, Agent Economy, Open Innovation
+
+## Why I built this
+
+AI agents are getting wallets now. People are letting them pay invoices send money move funds and the only proof they are safe is a benchmark score the models maker might have already seen. I wanted something. An AI should earn a licence before it touches money and anyone anywhere should be able to take that licence by catching it paying a scam. No committee no "trust us". Your trap catches it the contract revokes it. Pays you. I built this in three days from Nigeria with zero budget and the first people who tried it caught Claude Sonnet, Claude Haiku and Qwen. That's the point.
+
+— Miracle ([0xMiiracle](https://github.com/miracle352))
 
 ## Check it in two minutes
 
