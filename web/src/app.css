@@ -178,3 +178,5 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--i
 .stamp { font: 800 0.9rem/1 var(--display); padding: 0.5rem 0.7rem; border-radius: 10px; border: 2.5px solid currentColor; transform: rotate(-4deg); color: var(--red-ink); white-space: nowrap; }
 .stamp.yes { color: var(--green-ink); }
 @media (max-width: 1000px) { .agent-grid { grid-template-columns: 1fr; } }
+
+.ac-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }

@@ -349,11 +349,12 @@ async function renderMyAgents() {
   const rows = await Promise.all(agents.map(async (a) => [a, await view("licence", { model: a.id, skill: "money" }).catch(() => null)]));
   box.innerHTML = rows.map(([a, l]) => {
     const total = sets.reduce((t, [, s]) => t + each(s, a.model), 0n) + 3n * 10n ** 23n;
-    const status = !l ? "" : l.licensed ? `<span class="stamp yes">LICENSED</span>` : l.asked >= l.min_questions ? `<span class="stamp">NOT LICENSED</span>` : "";
+    const status = !l ? "" : l.suspension ? `<span class="stamp">${l.suspension.confirmed ? "REVOKED" : "SUSPENDED"}</span>` : l.licensed ? `<span class="stamp yes">LICENSED</span>` : l.asked >= l.min_questions ? `<span class="stamp">NOT LICENSED</span>` : "";
     return `<article class="agent-card">
       <div class="ac-top"><div><b>${esc(a.name)}</b><small>${esc(modelName(a.model))}, registered in block ${a.block_height.toLocaleString()}</small></div>${status}</div>
       ${l ? `<p class="note">${esc(l.reason[0].toUpperCase() + l.reason.slice(1))}. ${l.asked} of 42 answered, ${l.percent}% right${BigInt(l.lost) > 0n ? `, scams worth ${near(l.lost)} NEAR approved` : ""}.</p>` : ""}
-      <button class="btn primary" type="button" data-sit="${esc(a.id)}"><span class="dot"></span>Sit the licence exam: 6 transactions, about ${near(total, 2)} NEAR</button>
+      <div class="ac-actions"><a class="btn ghost" href="/record?model=${encodeURIComponent(a.id)}">Open its licence record</a>
+      <button class="btn primary" type="button" data-sit="${esc(a.id)}"><span class="dot"></span>Sit the licence exam: 6 transactions, about ${near(total, 2)} NEAR</button></div>
       <p class="note">Includes 0.3 NEAR for your agent's own wallet, so the scams it approves really cost it. About three minutes. <button class="link danger" type="button" data-remove="${esc(a.id)}">Remove this agent</button></p>
     </article>`;
   }).join("");
