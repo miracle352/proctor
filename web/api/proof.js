@@ -13,6 +13,7 @@ import { NET } from "../network.js";
 const ARCHIVE = NET.id === "mainnet" ? "https://archival-rpc.mainnet.near.org" : "https://archival-rpc.testnet.near.org";
 const API = NET.outlayerApi;
 const cache = new Map();
+export const config = { maxDuration: 60 };
 
 async function rpc(method, params, url = ARCHIVE) {
   for (let i = 0; i < 3; i++) {
@@ -30,14 +31,15 @@ const same = (out, c) => out && out.set_id === c.set_id && out.model === c.model
 
 async function findReport(c) {
   // outlayer.testnet lives on shard 5; if the layout changes, read every chunk
+  const heights = Array.from({ length: 13 }, (_, i) => c.block_height - i);
   for (const shard of [5, null]) {
-    for (let b = c.block_height; b >= c.block_height - 12; b--) {
-      let chunks;
-      if (shard !== null) chunks = [await rpc("chunk", { block_id: b, shard_id: shard })].filter(Boolean);
-      else {
-        const blk = await rpc("block", { block_id: b });
-        chunks = blk ? await Promise.all(blk.chunks.filter((x) => x.height_included === b).map((x) => rpc("chunk", { chunk_id: x.chunk_hash }))) : [];
-      }
+    const perBlock = await Promise.all(heights.map(async (b) => {
+      if (shard !== null) return [await rpc("chunk", { block_id: b, shard_id: shard })].filter(Boolean);
+      const blk = await rpc("block", { block_id: b });
+      return blk ? Promise.all(blk.chunks.filter((x) => x.height_included === b).map((x) => rpc("chunk", { chunk_id: x.chunk_hash }))) : [];
+    }));
+    for (const [k, chunks] of perBlock.entries()) {
+      const b = heights[k];
       for (const ch of chunks) {
         for (const r of ch?.receipts || []) {
           if (r.receiver_id !== NET.outlayer) continue;
