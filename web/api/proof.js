@@ -10,19 +10,34 @@
 import { view, CONTRACT } from "./_lib.js";
 import { NET } from "../network.js";
 
-const ARCHIVE = NET.id === "mainnet" ? "https://archival-rpc.mainnet.near.org" : "https://archival-rpc.testnet.near.org";
+const ARCHIVE = NET.id === "mainnet"
+  ? ["https://archival-rpc.mainnet.fastnear.com", "https://archival-rpc.mainnet.near.org"]
+  : ["https://archival-rpc.testnet.fastnear.com", "https://archival-rpc.testnet.near.org"];
 const API = NET.outlayerApi;
 const cache = new Map();
 export const config = { maxDuration: 60 };
 
-async function rpc(method, params, url = ARCHIVE) {
-  for (let i = 0; i < 3; i++) {
-    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-    const j = await r.json().catch(() => null);
-    if (j?.result) return j.result;
-    await new Promise((res) => setTimeout(res, 400 * (i + 1)));
+// archival nodes throttle; alternate between two and back off. A chunk that
+// never loads is an error, not "not found".
+async function rpc(method, params) {
+  for (let i = 0; i < 6; i++) {
+    const url = ARCHIVE[i % ARCHIVE.length];
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+      const j = await r.json();
+      if (j.result) return j.result;
+      // a block with no chunk for this shard is a real answer
+      if (/UNKNOWN_CHUNK|UNKNOWN_BLOCK|not found/i.test(JSON.stringify(j.error || ""))) return null;
+    } catch {}
+    await new Promise((res) => setTimeout(res, 300 * (i + 1)));
   }
-  return null;
+  throw new Error(`archival node didn't answer ${method}`);
+}
+
+async function inBatches(items, n, fn) {
+  const out = [];
+  for (let i = 0; i < items.length; i += n) out.push(...await Promise.all(items.slice(i, i + n).map(fn)));
+  return out;
 }
 
 // the report for this certificate: same chat ids, or same model, set and start
@@ -33,11 +48,11 @@ async function findReport(c) {
   // outlayer.testnet lives on shard 5; if the layout changes, read every chunk
   const heights = Array.from({ length: 13 }, (_, i) => c.block_height - i);
   for (const shard of [5, null]) {
-    const perBlock = await Promise.all(heights.map(async (b) => {
+    const perBlock = await inBatches(heights, 4, async (b) => {
       if (shard !== null) return [await rpc("chunk", { block_id: b, shard_id: shard })].filter(Boolean);
       const blk = await rpc("block", { block_id: b });
       return blk ? Promise.all(blk.chunks.filter((x) => x.height_included === b).map((x) => rpc("chunk", { chunk_id: x.chunk_hash }))) : [];
-    }));
+    });
     for (const [k, chunks] of perBlock.entries()) {
       const b = heights[k];
       for (const ch of chunks) {
