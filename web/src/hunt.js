@@ -161,27 +161,52 @@ async function guestHunt(out, btn) {
   if (!/^[a-z0-9]{1,16}$/.test(name)) { toast("Pick a name with letters and numbers only.", true); $("#guest-name").focus(); return; }
   btn.setAttribute("aria-busy", "true");
   const say = (t) => (btn.textContent = t);
+  let setId = null, s = null, sent = false;
+  const opened = (fired) => {
+    if (fired?.length) showdown(setId, fired);
+    out.hidden = false; out.className = "out ok";
+    out.innerHTML = `<strong>The trap is set</strong><span>${esc(setId)} is live. Sealed to OutLayer key ${esc(s.pubkey)}. Watch the AIs answer below.</span>
+      <button type="button" class="link" id="save-copy">Save a copy of your questions</button>`;
+    $("#save-copy").onclick = () => download(`${setId}.json`, s.text);
+  };
   try {
     say("Sealing in your browser");
     const { sponsor } = await guestApi();
     if (!sponsor) throw new Error("Guest hunts aren't switched on yet. Connect a wallet instead.");
-    const setId = `hunt-g-${name}-${Date.now().toString(36)}`;
+    setId = `hunt-g-${name}-${Date.now().toString(36)}`;
     const items = sealedItems(sponsor);
-    const s = await sealHunt({ owner: sponsor, setId, items, build: D.config.grader_version });
+    s = await sealHunt({ owner: sponsor, setId, items, build: D.config.grader_version });
+    // this browser keeps the questions; they are needed to reveal
     store.set(KEEP(setId), s.text); addGuest(setId);
-    download(`${setId}.json`, s.text);
     say("Opening it and firing at every licence holder");
     const targets = D.board.filter((x) => !x.l.suspension).map((x) => x.model);
     showdown(setId, targets);
+    sent = true;
     const r = await guestApi({ action: "open", set_id: setId, sha256: s.sha256, size: items.length, store: s.store });
-    if (r.fired?.length) showdown(setId, r.fired);
-    out.hidden = false; out.className = "out ok";
-    out.innerHTML = `<strong>The trap is set</strong><span>${esc(setId)} is live. Sealed to OutLayer key ${esc(s.pubkey)}. Watch the AIs answer below.</span>`;
+    opened(r.fired);
   } catch (err) {
-    // nothing was opened, so there is nothing to watch
-    if (SD) { clearTimeout(SD.t); SD = null; } $("#showdown").hidden = true;
-    try { localStorage.removeItem(SDKEY); } catch {}
-    out.hidden = false; out.className = "out bad"; out.innerHTML = `<strong>Not opened</strong><span>${esc(plain(err))}</span>`;
+    // A phone can drop a long request (screen lock, switching apps) after the
+    // server has already opened the hunt. Ask the chain before saying it failed.
+    let hunt = null;
+    if (sent && setId) {
+      say("Checking NEAR for your hunt");
+      for (let i = 0; i < 12 && !hunt; i++) {
+        hunt = await view("get_hunt", { set_id: setId }).catch(() => null);
+        if (!hunt) await new Promise((r) => setTimeout(r, 2500));
+      }
+    }
+    if (hunt) {
+      const r = await guestApi({ action: "fire", set_id: setId }).catch(() => null);
+      opened(r?.fired);
+    } else {
+      if (SD) { clearTimeout(SD.t); SD = null; } $("#showdown").hidden = true;
+      try { localStorage.removeItem(SDKEY); } catch {}
+      const net = /load failed|failed to fetch|networkerror|network/i.test(String(err?.message || err));
+      out.hidden = false; out.className = "out bad";
+      out.innerHTML = `<strong>Not opened</strong><span>${net
+        ? "The connection dropped before the guest service answered, and NEAR has no hunt under that name. Keep this tab open and on screen, then press Seal again."
+        : esc(plain(err))}</span>`;
+    }
   } finally { btn.removeAttribute("aria-busy"); btn.innerHTML = `<span class="dot"></span>Seal it and set the trap`; refresh(); }
 }
 
