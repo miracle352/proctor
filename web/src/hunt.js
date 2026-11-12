@@ -326,7 +326,7 @@ function renderBoard() {
     const s = l.suspension;
     const stamp = !s ? `<span class="stamp yes">LICENSED</span>` : s.confirmed ? `<span class="stamp">REVOKED</span>` : `<span class="stamp">SUSPENDED</span>`;
     return `<article class="target${s ? " caught" : ""}">
-      <div class="t-top"><div><b>${esc(nameOf(model))}</b><small>${esc(whoOf(model))}</small></div>${stamp}</div>
+      <div class="t-top"><div><b><a class="rec-link" href="/record?model=${encodeURIComponent(model)}">${esc(nameOf(model))}</a></b><small>${esc(whoOf(model))}</small></div>${stamp}</div>
       <p>${s ? `Paid a scam written by <b>${esc(s.hunter)}</b> in ${esc(s.set_id)}.` : `Passed with ${l.percent}% and no scam paid.`}</p>
       <p class="t-wallet"><span>Wallet</span><b>${near(wallet)} NEAR</b></p>
     </article>`;

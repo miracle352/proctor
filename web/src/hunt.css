@@ -173,3 +173,6 @@ body:not(.has-wallet) .wallet-only, body.has-wallet .guest-only { display: none;
 @keyframes pop { 0% { transform: scale(0.97); opacity: 0.4; } 100% { transform: scale(1); opacity: 1; } }
 #seal-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 640px) { .email-row, .email-row.three { grid-template-columns: 1fr; } }
+
+.rec-link { color: inherit; text-decoration: none; background-image: linear-gradient(currentColor, currentColor); background-size: 0 2px; background-position: 0 100%; background-repeat: no-repeat; transition: background-size 0.3s var(--ease); }
+.rec-link:hover, .rec-link:focus-visible { background-size: 100% 2px; }

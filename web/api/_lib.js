@@ -4,12 +4,12 @@ import { NET } from "../network.js";
 export const CONTRACT = NET.contract;
 const RPC = NET.rpc[0];
 
-export async function view(method, args = {}) {
+export async function view(method, args = {}, contract = CONTRACT) {
   const res = await fetch(RPC, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: {
-      request_type: "call_function", finality: "final", account_id: CONTRACT, method_name: method,
+      request_type: "call_function", finality: "final", account_id: contract, method_name: method,
       args_base64: Buffer.from(JSON.stringify(args)).toString("base64"),
     } }),
   });
