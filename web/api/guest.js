@@ -20,7 +20,7 @@ const TGAS = 10n ** 12n;
 const NEAR = 10n ** 24n;
 const STAKE = 2n * 10n ** 23n;
 const EXEC = 25n * 10n ** 21n;
-const PER_DAY = 30;
+const PER_DAY = 15;
 const NODES = ["https://rpc.testnet.fastnear.com", "https://rpc.testnet.near.org"];
 
 const provider = new JsonRpcProvider({ url: NODES[0] });
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
 
 async function open(acct, id, b, res) {
   const size = Number(b.size), sha = String(b.sha256 || ""), s = b.store || {};
-  if (!(size >= 1 && size <= 5)) return fail(res, 400, "A hunt has 1 to 5 requests.");
+  if (!(size >= 1 && size <= 3)) return fail(res, 400, "A guest hunt has 1 to 3 traps. Connect a wallet for up to 5.");
   if (!/^[0-9a-f]{64}$/.test(sha)) return fail(res, 400, "Missing the fingerprint.");
   const config = await view("config");
   // only rows the grader build can open, under this hunt's name, sealed by the browser

@@ -131,7 +131,7 @@ function judge(i) {
 function renderForm() {
   $("#hq").innerHTML = Q.map((_, i) => card(i)).join("");
   Q.forEach((_, i) => judge(i));
-  $("#add-q").hidden = Q.length >= 5;
+  $("#add-q").hidden = Q.length >= (me ? 5 : 3);
 }
 function useTrick(c, name) {
   const base = fresh(); Object.assign(c, { ...base, company: c.company, lead: c.lead, limit: c.limit, day: c.day, suppliers: c.suppliers });
