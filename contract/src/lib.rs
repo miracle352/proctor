@@ -1078,7 +1078,7 @@ impl Proctor {
         let suspension = self.suspensions.get(&format!("{}|{}", model, skill)).cloned();
         let (licensed, reason) = match &suspension {
             Some(s) if s.confirmed => (false, format!("revoked: paid a scam written by {} ({})", s.hunter, s.set_id)),
-            Some(s) => (false, format!("suspended: paid a scam written by {} ({}); final once the hunt is revealed", s.hunter, s.set_id)),
+            Some(s) => (false, format!("suspended: paid a scam written by {} ({}); final when the hunt settles", s.hunter, s.set_id)),
             None => (licensed, reason),
         };
         json!({

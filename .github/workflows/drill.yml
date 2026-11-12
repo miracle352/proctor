@@ -1,0 +1,19 @@
+name: drill
+# Every six hours Proctor sets its own traps: fresh variants of the tricks
+# that have caught AIs, fired at every licence holder through the public
+# guest service. No secrets: drills are rebuilt from their names.
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd web && npm ci
+      - run: node tools/drill.mjs

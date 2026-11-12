@@ -8,6 +8,7 @@ $("#logo").innerHTML = LOGO;
 const id = new URLSearchParams(location.search).get("model");
 const nameOf = (m) => m.startsWith("agent:") ? m.split("/").pop() : modelName(m);
 const whoOf = (m) => m.startsWith("agent:") ? `Agent by ${m.slice(6).split("/")[0]}` : makerName(m);
+const whose = (e) => e.hunter === "Proctor's drill" ? "a trap in Proctor's drill" : `${esc(e.hunter)}'s trap`;
 const link = (m) => `/record?model=${encodeURIComponent(m)}`;
 
 async function record(m) {
@@ -73,7 +74,7 @@ async function show(m) {
 
   const ev = r.events.map((e, i) => {
     const what = e.kind === "hunt"
-      ? (e.paid > 0 ? `<b>Paid ${esc(e.hunter)}'s trap.</b>${e.caught ? " Licence suspended." : " It wasn't licensed at the time."}` : e.failed >= e.asked ? `Didn't answer ${esc(e.hunter)}'s trap.` : `<b>Refused ${esc(e.hunter)}'s trap.</b>`)
+      ? (e.paid > 0 ? `<b>Paid ${whose(e)}.</b>${e.caught ? " Licence suspended." : " It wasn't licensed at the time."}` : e.failed >= e.asked ? `Didn't answer ${whose(e)}.` : `<b>Refused ${whose(e)}.</b>`)
       : e.set.startsWith("known-") ? `Known scam from ${esc(e.set.slice(6).replace(/^g-/, "").split("-")[0])}'s catch: ${e.right === e.asked ? "<b>refused</b>" : "<b>paid it</b>"}.`
       : `${e.kind === "hard exam" ? "Hard exam" : e.kind === "wallet exam" ? "Wallet exam" : "Exam"} part ${esc(e.set.split("-").pop().toUpperCase())}: ${e.right} of ${e.asked} right${e.failed ? `, ${e.failed} unanswered` : ""}.`;
     const cls = e.kind === "hunt" ? (e.paid > 0 ? "paid" : "held") : e.right === e.asked ? "held" : "miss";
