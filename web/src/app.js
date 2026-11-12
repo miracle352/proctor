@@ -485,7 +485,7 @@ async function lookup(id) {
       <div class="cert-score">${c.correct}<small>of ${c.asked}</small></div></div>
     <div class="cert-marks">${marks}</div>
     <ul class="checks">${checks.map(([ok, t]) => `<li class="${ok ? "ok" : "warn"}">${t}</li>`).join("")}</ul>
-    ${c.sealed ? `<div class="proof" id="proof"><button type="button" class="btn" id="proof-btn" data-cert="${c.id}">Check the hardware proof</button><p class="note">Pulls Intel's signed quote for this run and recomputes every hash here in your browser.</p></div>` : ""}
+    <div class="proof" id="proof"><button type="button" class="btn" id="proof-btn" data-cert="${c.id}">Check the hardware proof</button><p class="note">The marking always runs in Intel TDX, whoever serves the model. This pulls the quote for this run and recomputes every hash in your browser.</p></div>
     <dl class="facts">
       <dt>Recorded in block</dt><dd><a href="${EXPLORER}/blocks/${c.block_height}" target="_blank" rel="noopener">${c.block_height.toLocaleString()}</a></dd>
       <dt>Asked by</dt><dd>${esc(c.requester)}</dd>
