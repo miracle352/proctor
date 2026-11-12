@@ -1,7 +1,8 @@
 // Server-side reads for the badge and the JSON scores. Same rules as the site:
 // only certificates from marking builds the contract lists as comparable count.
-export const CONTRACT = "app.proctor-91796.testnet";
-const RPC = "https://rpc.testnet.fastnear.com";
+import { NET } from "../network.js";
+export const CONTRACT = NET.contract;
+const RPC = NET.rpc[0];
 
 export async function view(method, args = {}) {
   const res = await fetch(RPC, {

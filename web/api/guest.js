@@ -12,16 +12,17 @@ import { KeyPairSigner } from "@near-js/signers";
 
 export const config = { maxDuration: 60 };
 
-const CONTRACT = "app.proctor-91796.testnet";
-const OUTLAYER = "outlayer.testnet";
-const PROJECT = "proctor-91796.testnet/grader";
+import { NET } from "../network.js";
+const CONTRACT = NET.contract;
+const OUTLAYER = NET.outlayer;
+const PROJECT = NET.graderProject;
 const SKILL = "money";
 const TGAS = 10n ** 12n;
 const NEAR = 10n ** 24n;
 const STAKE = 2n * 10n ** 23n;
 const EXEC = 25n * 10n ** 21n;
 const PER_DAY = 15;
-const NODES = ["https://rpc.testnet.fastnear.com", "https://rpc.testnet.near.org"];
+const NODES = NET.rpc;
 
 const provider = new JsonRpcProvider({ url: NODES[0] });
 const view = async (method, args = {}) => {
@@ -33,7 +34,7 @@ const view = async (method, args = {}) => {
       if (j.result?.error) throw Object.assign(new Error(j.result.error), { final: true });
     } catch (e) { if (e.final) throw e; }
   }
-  throw new Error("NEAR testnet isn't answering");
+  throw new Error(`NEAR ${NET.id} isn't answering`);
 };
 
 const fail = (res, code, error) => res.status(code).json({ error });
@@ -95,7 +96,7 @@ async function open(acct, id, b, res) {
   const today = (await view("list_hunts")).filter((h) => h.hunter === acct.accountId && h.opened_ms > day).length;
   if (today >= PER_DAY) return fail(res, 429, "Today's free guest hunts are used up. Connect a wallet, or come back tomorrow.");
   const bal = BigInt((await provider.viewAccount(acct.accountId, { finality: "final" })).amount);
-  if (bal < 1n * NEAR) return fail(res, 503, "The guest account is out of testnet NEAR. Connect a wallet instead.");
+  if (bal < 1n * NEAR) return fail(res, 503, `The guest account is out of ${NET.id} NEAR. Connect a wallet instead.`);
   const storage = BigInt(s.encrypted_secrets_base64.length + 2000) * 10n ** 19n;
   await call(acct, OUTLAYER, "store_secrets", s, storage, 100n);
   await call(acct, CONTRACT, "open_hunt", { set_id: id, sha256: sha, size, skill: SKILL }, STAKE, 50n);

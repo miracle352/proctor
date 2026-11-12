@@ -10,9 +10,10 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { chacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { bytesToHex, hexToBytes, randomBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 
-export const OUTLAYER = "outlayer.testnet";
-export const GRADER_PROJECT = "proctor-91796.testnet/grader";
-const KEYSTORE = "https://testnet-api.outlayer.ai/secrets/pubkey";
+import { NET } from "../network.js";
+export const OUTLAYER = NET.outlayer;
+export const GRADER_PROJECT = NET.graderProject;
+const KEYSTORE = NET.keystore;
 
 // The keystore's key for this owner. The plaintext is never sent: the key
 // does not depend on it, so the request carries "{}".

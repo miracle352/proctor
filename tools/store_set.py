@@ -58,7 +58,7 @@ def main():
     out = subprocess.run(["near", "contract", "call-function", "as-transaction", OUTLAYER, "store_secrets",
                           "json-args", json.dumps(args), "prepaid-gas", "100 Tgas",
                           "attached-deposit", f"{deposit} yoctoNEAR", "sign-as", owner,
-                          "network-config", "testnet", "sign-with-keychain", "send"],
+                          "network-config", os.environ.get("NETWORK", "testnet"), "sign-with-keychain", "send"],
                          capture_output=True, text=True)
     text = out.stdout + out.stderr
     ok = "succeeded" in text.lower() or "Transaction ID" in text and "Failure" not in text

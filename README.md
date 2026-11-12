@@ -35,6 +35,21 @@ Then check the code that decides hunts:
 cd contract && cargo test   # 16 tests, including 400 browser-written hunt questions replayed byte for byte
 ```
 
+## What's proven, what's trusted
+
+| Claim | How you can check it | What it rests on |
+|---|---|---|
+| A licensed AI that pays a hunter's trap loses its money licence in the same transaction | `python3 tools/check.py`; certificates 982 (Sonnet), 1146 (Haiku), 1126 (careful-payer) | The contract (`record_catch` in `contract/src/lib.rs`), read straight from chain |
+| Two settled hunts revoked Claude Sonnet's and Claude Haiku's money licences and paid the hunters | `hunt_settled` events on `app.proctor-91796.testnet`; `tools/check.py` shows "revoked" | The contract |
+| Answer keys of hunts built on the page are checked by code, not by anyone | `contract/src/case.rs`; `cargo test` replays 400 browser-written cases byte for byte; the `keys_checked` event on each reveal | The contract and its tests |
+| Other contracts act on the licence | `vault.proctor-91796.testnet` (pays a bill only for a licensed AI) and `budget.proctor-91796.testnet` (froze Haiku's 0.3 NEAR budget and sent it home, tx `8DfsqjJc8eXyPZs32dBAT8wRsErXnhLVdMrfb52mCvui`) | Each contract's own cross-contract call to `licence` |
+| Nobody, us included, can read a hunt before the AIs answer | `web/src/seal.js` encrypts in the browser; the guest relay receives only ciphertext (`web/api/guest.js`) | **Trusted:** OutLayer's keystore and its Intel TDX enclave release the secret only to the pinned grader build. We don't verify TDX quotes ourselves. The keystore's public key reaches the page through our relay, so the page prints it for you to compare with the `outlayer` CLI |
+| The grader that marked an answer is the build we published | Every certificate carries `grader_version`; the contract refuses reports from any other build | **Trusted:** OutLayer runs the build with that hash |
+| The AI saw exactly the sealed question | The grader checks the set's sha256 against the fingerprint committed on chain before any AI saw it | **Trusted:** OutLayer, as above |
+| What the model answered | Only the mark leaves the enclave | **Trusted:** the model provider. Only Qwen 3.8 runs in an attested TEE; Claude, GPT and Gemini run on their makers' servers, and the certificate records that (`sealed: false`) |
+
+Scores are one run per model on 42 questions per test. The catches are single events, real on chain, but not statistics.
+
 ## Try it
 
 1. Open https://useproctor.vercel.app/hunt. No wallet needed.
@@ -83,8 +98,9 @@ cd contract && cargo test && cargo near build non-reproducible-wasm
 # grader
 cd grader && cargo test --lib && cargo build --release --target wasm32-wasip2
 
-# demo vault
+# the two contracts that act on a licence
 cd vault && cargo near build non-reproducible-wasm
+cd budget && cargo test && cargo near build non-reproducible-wasm
 
 # site (the /api functions run on Vercel)
 cd web && npm install && npm run dev
@@ -93,6 +109,10 @@ cd web && npm install && npm run dev
 For developers: `GET /api/scores` (every score as JSON), `GET /api/licence?model=…&skill=money`, `GET /api/badge?model=…[&skill=money]` (live SVG badge). See https://useproctor.vercel.app/developers.
 
 `tools/` has the scripts used for the live deployment: `check.py` (read-only state), `make_money_exam_v2.py` in `twins/` (the hard test), `store_set.py` (seal a set without the CLI's fixed deposit), `case_fixtures.mjs` (the 400 replayed hunt questions), `seal_set.py` (build and fingerprint a set), `release_grader.sh` (upload a grader build, re-lock every set to it, point the contract at it), `run.py` and `run_all.py` (certified runs from the CLI), `report.py` (scores, gaps, writer outliers).
+
+## Testnet and mainnet
+
+Everything network-specific lives in `web/network.js`. The site builds for testnet by default; `VITE_NETWORK=mainnet` (and `NETWORK=mainnet` for the `/api` functions) switches contract names, RPC nodes, OutLayer's contract and keystore, and explorer links in one place. Nothing is deployed on mainnet yet. `tools/deploy_mainnet.sh` is the whole procedure: run it with `OWNER=you.near` to print every step, add `SEND=1` to do it. The contracts and grader are the same code; exams must be generated fresh for mainnet. Rough cost: about 7 NEAR of storage for the two contracts, 0.2 NEAR per sealed set, and per question OutLayer's execution fee plus the model's NEAR AI Cloud price. `licence()` stays a free view call for anyone.
 
 ## Limits
 

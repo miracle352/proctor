@@ -18,7 +18,7 @@ export async function initWallet() {
     network: NETWORK,
     modules: [setupMyNearWallet(), setupMeteorWallet(), setupHereWallet(), setupIntearWallet()],
   });
-  modal = setupModal(selector, { contractId: CONTRACT, description: "Connect a NEAR testnet account to run and record exams. It costs nothing real." });
+  modal = setupModal(selector, { contractId: CONTRACT, description: NETWORK === "testnet" ? "Connect a NEAR testnet account to run and record exams. It costs nothing real." : "Connect a NEAR account to run and record exams." });
   const pick = (s) => s.accounts.find((a) => a.active)?.accountId || null;
   current = pick(selector.store.getState());
   selector.store.observable.subscribe((s) => {

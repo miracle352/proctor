@@ -1,15 +1,16 @@
 // Reads come straight from the contract on NEAR testnet. No server, no cache.
 
-export const CONTRACT = "app.proctor-91796.testnet";
-export const VAULT = "vault.proctor-91796.testnet";
-export const SCAMMER = "scammer.proctor-91796.testnet";
-export const NETWORK = "testnet";
-export const RPC = "https://rpc.testnet.fastnear.com";
-export const EXPLORER = "https://testnet.nearblocks.io";
+import { NET } from "../network.js";
+export const CONTRACT = NET.contract;
+export const VAULT = NET.vault;
+export const SCAMMER = NET.scammer;
+export const NETWORK = NET.id;
+export const RPC = NET.rpc[0];
+export const EXPLORER = NET.explorer;
 export const YOCTO = 10n ** 24n;
 
 // A public node can throttle or drop a request; try the next one before giving up.
-const NODES = [RPC, "https://test.rpc.fastnear.com", "https://rpc.testnet.near.org", "https://near-testnet.drpc.org"];
+const NODES = NET.rpc;
 let good = 0;
 async function rpc(method, params) {
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });

@@ -1,3 +1,4 @@
+import { NET } from "../network.js";
 import "./fonts.js";
 import "./base.css";
 import "./landing.css";
@@ -197,7 +198,7 @@ function renderWallets() {
 /* agents: same model, different instructions */
 async function renderAgents() {
   const { view } = await import("./chain.js");
-  const agents = (await view("list_agents").catch(() => [])).filter((a) => a.owner === "builder.proctor-91796.testnet");
+  const agents = (await view("list_agents").catch(() => [])).filter((a) => a.owner === NET.demoOwner);
   if (!agents.length) { $("#agents").hidden = true; return; }
   const rows = await Promise.all(agents.map(async (a) => [a, await view("licence", { model: a.id, skill: "money" }).catch(() => null)]));
   rows.sort(([a], [b]) => a.name.localeCompare(b.name));
