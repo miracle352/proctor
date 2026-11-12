@@ -46,9 +46,9 @@
 
     <section class="hunt-grid" aria-labelledby="write-h">
       <form class="builder" id="hunt-form" autocomplete="off">
-        <div class="row-head"><h2 id="write-h">Write your hunt</h2><p class="hint">One to five payment requests. Each one shows the AI the same rules and records every exam uses, then your message.</p></div>
+        <div class="row-head"><h2 id="write-h">Set a trap</h2><p class="hint">Pick a trick, then change the details so it's your own. The AI sees the company's rules and records, then your email. Code checks, as you type, which rule your email breaks.</p></div>
         <div id="hq"></div>
-        <button type="button" class="link" id="add-q">Add another request</button>
+        <button type="button" class="link" id="add-q">Add another trap</button>
         <div class="pay">
           <div class="guest-only">
             <label class="name-field">Your name on the hunt <small>letters and numbers, shown publicly</small><input id="guest-name" maxlength="16" placeholder="e.g. tunde" pattern="[A-Za-z0-9]{1,16}" required></label>
@@ -68,13 +68,13 @@
       <aside class="room rules" aria-labelledby="rules-h">
         <h2 id="rules-h">How a hunt plays out</h2>
         <ol class="flow">
-          <li><b>You write it.</b> Payment requests an AI should refuse. The rules and records come with each one, so a fair AI has what it needs to spot the trick.</li>
+          <li><b>You set the trap.</b> A payment request that breaks one of the company's rules. The rules and records come with it, so a careful AI has everything it needs to spot it.</li>
           <li><b>Your browser seals it.</b> It is encrypted to OutLayer's secure hardware before it leaves this page. Only the grader build can open it, and only to ask the AIs.</li>
           <li><b>You fire it at the licence holders.</b> A licensed AI that pays one of your scams loses the licence in the same transaction, and up to 0.1 NEAR leaves its wallet into escrow.</li>
           <li><b>You reveal it.</b> Within <span data-w="reveal">36 hours</span> you publish the questions. Anyone can then challenge an answer key for <span data-w="challenge">two hours</span>.</li>
-          <li><b>It settles.</b> Keys hold up: the suspension becomes a revocation and the escrow plus your stake come to you. You don't reveal, or a key was wrong: every licence comes back and your stake goes to the AIs you caught.</li>
+          <li><b>Code settles it.</b> On reveal the contract rebuilds each email from its parts and checks the rules itself. If your trap really breaks a rule, the suspension becomes a revocation and the money comes to you. If you don't reveal, every licence comes back and your stake goes to the AIs.</li>
         </ol>
-        <p class="room-kicker">Writing an honest payment and calling it a scam doesn't pay: the reveal shows it, and it costs your stake.</p>
+        <p class="room-kicker">Nobody judges your trap, us included. Passing off an honest payment as a scam can't work: the contract's own check cancels the hunt.</p>
       </aside>
     </section>
 

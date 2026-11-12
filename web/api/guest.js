@@ -113,7 +113,7 @@ async function fire(acct, id, hunt, res) {
   const agentOf = Object.fromEntries(agents.map((a) => [a.id, a]));
   const targets = candidates.filter((m, i) => lic[i]?.licensed);
   const n = BigInt(set.size);
-  const sent = [];
+  const sent = [], skipped = [];
   for (const m of targets) {
     const agent = agentOf[m];
     const fee = fees[agent ? agent.model : m] * n + EXEC;
@@ -125,7 +125,7 @@ async function fire(acct, id, hunt, res) {
         args: agent ? { agent_id: m, set_id: id, start: 0, count: Number(n) } : { set_id: id, model: m, start: 0, count: Number(n) },
       });
       sent.push(m);
-    } catch (e) { /* one busy model shouldn't stop the rest */ }
+    } catch (e) { skipped.push([m, panic(e)]); /* one busy model shouldn't stop the rest */ }
   }
-  return res.json({ ok: true, fired: sent });
+  return res.json({ ok: true, fired: sent, skipped });
 }
