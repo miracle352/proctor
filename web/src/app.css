@@ -211,3 +211,5 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--i
 .proof p.note { display: block; }
 .proof p.note a { color: var(--blue); }
 @media (max-width: 560px) { .proof { margin-inline: -0.4rem; padding: 0.9rem 0.8rem; } .proof-rows li { column-gap: 0.5rem; } }
+.card { grid-template-columns: minmax(0, 1fr); }
+.card pre { max-width: 100%; overflow-x: auto; }

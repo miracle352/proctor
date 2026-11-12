@@ -13,7 +13,7 @@
 }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; scroll-padding-top: 5.5rem; -webkit-text-size-adjust: 100%; overflow-x: clip; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 400 1.125rem/1.6 var(--body); -webkit-font-smoothing: antialiased; overflow-x: clip; }
 h1, h2, h3, h4, p, ul, ol, figure, dl, dd { margin: 0; }
 ul, ol { padding: 0; list-style: none; }

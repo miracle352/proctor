@@ -354,3 +354,5 @@ details[open] > div > p { padding-bottom: 1.5rem; }
 .lcard.agent blockquote { margin: 0; padding: 0.9rem 1rem; background: var(--paper); border-radius: 12px; font-size: 0.95rem; color: var(--ink-2); line-height: 1.5; }
 .lcard.agent .maker b { color: var(--ink); }
 @media (max-width: 820px) { .agent-pair { grid-template-columns: 1fr; } }
+.window-stage, .window { min-width: 0; max-width: 100%; }
+.window .wt-grid { min-width: 0; }
