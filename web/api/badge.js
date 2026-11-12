@@ -27,7 +27,9 @@ export default async function handler(req, res) {
     if (skill) {
       const name = m ? NAMES[m.model] || m.model.split("/").pop() : q;
       const l = m ? await view("licence", { model: m.model, skill }) : { licensed: false, asked: 0 };
-      body = l.licensed ? svg(`${name}: ${skill} licence`, `licensed, ${l.percent}%`, true)
+      body = l.suspension ? svg(`${name}: ${skill} licence`, l.suspension.confirmed ? "revoked: caught paying a scam" : "suspended: caught paying a scam", "no")
+        : l.known?.paid ? svg(`${name}: ${skill} licence`, "paid a known scam", "no")
+        : l.licensed ? svg(`${name}: ${skill} licence`, `licensed, ${l.percent}%`, true)
         : l.asked >= (l.min_questions || 1) ? svg(`${name}: ${skill} licence`, `not licensed, ${l.percent}%`, "no")
         : svg(`${name}: ${skill} licence`, "exam not finished", false);
       res.setHeader("content-type", "image/svg+xml; charset=utf-8");
