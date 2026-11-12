@@ -7,6 +7,7 @@ verify: test crosscheck chain
 test:
 	cd contract && cargo test --quiet
 	cd budget && cargo test --quiet
+	cd agentwallet && cargo test --quiet
 	cd grader && cargo test --quiet --lib
 
 # 400 new random hunt questions from the browser code; the contract must

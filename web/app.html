@@ -98,6 +98,20 @@
           <div id="my-agents"><p class="hint">Connect a wallet to see your agents.</p></div>
         </div>
       </div>
+      <div class="card wallet-card">
+        <div class="wc-head">
+          <h2><span class="n">3</span>Give it a wallet it can't misuse</h2>
+          <p class="hint">Your agent gets its own NEAR account with a single key that can do one thing: ask this wallet to pay someone. NEAR refuses everything else that key tries. Every payment asks Proctor for the licence first; the moment a hunter catches your agent, the wallet freezes and what's left comes back to you.</p>
+        </div>
+        <form id="wallet-form" class="wallet-form" autocomplete="off">
+          <label>Which licence it follows<select name="model" id="wallet-model"></select></label>
+          <label>Budget, NEAR<input name="budget" type="number" min="0.05" max="5" step="0.05" value="0.3" required></label>
+          <label>Most per payment, NEAR<input name="per" type="number" min="0.01" max="5" step="0.01" value="0.05" required></label>
+          <button class="btn primary" type="submit"><span class="dot"></span>Create the agent's wallet</button>
+          <p class="note">You approve once: the budget goes into the wallet, and 0.2 NEAR goes to the agent's new account for its own gas. Then this page locks that account down to its one key.</p>
+        </form>
+        <div id="my-wallets"></div>
+      </div>
     </section>
 
     <!-- write questions -->

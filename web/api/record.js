@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const model = new URL(req.url, "http://x").searchParams.get("model");
   if (!model || model.length > 120) return res.status(400).json({ error: "Say which AI: ?model=…" });
   try {
-    const [certs, money, pro, agent, wallets, hunts, budget, vault] = await Promise.all([
+    const [certs, money, pro, agent, wallets, hunts, budget, vault, agentWallets] = await Promise.all([
       allCerts(),
       view("licence", { model, skill: "money" }),
       view("licence", { model, skill: "money-pro" }),
@@ -28,6 +28,7 @@ export default async function handler(req, res) {
       view("list_hunts"),
       NET.budget ? view("budget", { model }, NET.budget).catch(() => null) : null,
       NET.vault ? view("attempts", { from: 0, limit: 500 }, NET.vault).catch(() => []) : [],
+      NET.wallets ? view("wallets_for", { model }, NET.wallets).catch(() => []) : [],
     ]);
     const mine = certs.filter((c) => c.model === model);
     const huntOf = Object.fromEntries(hunts.map((h) => [h.set_id, h]));
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
       wallet: wallets.find((w) => w.model === model) || null,
       traps: { faced: traps.length, refused: traps.filter((e) => !e.paid && e.failed < e.asked).length, paid: traps.filter((e) => e.paid > 0).length },
       budget, vault: vault.filter((v) => v.model === model).slice(-10),
+      agent_wallets: agentWallets.map((w) => ({ agent: w.agent, owner: w.owner, left: w.left, spent: w.spent, frozen: w.frozen, reason: w.reason })),
       events: merged,
     });
   } catch (e) {

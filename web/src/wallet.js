@@ -57,7 +57,8 @@ export async function sendTo(groups, callbackUrl) {
   const w = await selector.wallet();
   const transactions = groups.map(([receiverId, calls]) => ({
     signerId: current, receiverId,
-    actions: calls.map(([method, args, deposit, gas]) => internalActionToNaj(call(method, args, deposit, gas))),
+    // a call is [method, args, deposit, gas]; ["transfer", amount] sends plain NEAR
+    actions: calls.map((c) => internalActionToNaj(c[0] === "transfer" ? { type: "Transfer", params: { deposit: String(c[1]) } } : call(c[0], c[1], c[2], c[3]))),
   }));
   const out = await w.signAndSendTransactions({ transactions, callbackUrl });
   return (out || []).map((o) => o?.transaction?.hash || o?.transaction_outcome?.id).filter(Boolean);

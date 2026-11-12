@@ -5,12 +5,14 @@ import {
   CONTRACT, EXPLORER, YOCTO, load, view, balance, txEvents, modelName, makerName, setLabel,
   short, near, esc, $, $$, still, wait, LOGO, ICON, sha256,
 } from "./chain.js";
+import { NET } from "../network.js";
 // The wallet libraries are large, so they load after the page has drawn.
 let W = null;
 const wallet = () => (W ||= import("./wallet.js"));
 const connect = async () => (await wallet()).connect();
 const disconnect = async () => (await wallet()).disconnect();
 const send = async (...a) => (await wallet()).send(...a);
+const sendTo = async (...a) => (await wallet()).sendTo(...a);
 
 $("#logo").innerHTML = LOGO;
 let D = null; // everything read from the contract
@@ -521,11 +523,11 @@ $("#mine").addEventListener("click", (e) => { const b = e.target.closest("[data-
   try { D = await load(); } catch (err) {
     $("#models").innerHTML = `<p class="fail">Couldn't reach NEAR (${esc(err.message)}). Reload to try again.</p>`; return;
   }
-  renderModels(); renderSets(); renderLength(); renderAgentModels();
+  renderModels(); renderSets(); renderLength(); renderAgentModels(); walletModels();
   const w = await wallet().catch((e) => { console.error("wallet load", e?.message, e?.stack?.slice(0, 400)); return null; });
   try { await w.initWallet(); } catch (err) { console.error(err); toast("The wallet picker didn't load. Reload to try again.", true); }
   w?.onAccount(async (a) => {
-    me = a; myBalance = null; renderWho(); refreshAllowance(); renderMyAgents();
+    me = a; myBalance = null; renderWho(); refreshAllowance(); renderMyAgents(); finishWalletSetup().then(renderWallets);
     if (me) { try { myBalance = await balance(me); } catch {} renderWho(); }
   });
   // back from a browser wallet with the transactions it sent
@@ -544,3 +546,80 @@ $("#mine").addEventListener("click", (e) => { const b = e.target.closest("[data-
   const hc = location.hash.match(/cert=(\d+)/);
   if (hc) { location.hash = "#check"; $("#cert-id").value = hc[1]; lookup(+hc[1]); }
 })();
+
+
+/* step 3: a licensed agent wallet (wallets contract + an account locked to one function-call key) */
+const WALLETS = NET.wallets;
+const PENDING = "proctor.agentwallet.pending", KEYS = (acct) => `proctor.agentwallet.${acct}`;
+const ls = { get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }, del: (k) => { try { localStorage.removeItem(k); } catch {} } };
+const toYocto = (n) => BigInt(Math.round(Number(n) * 1000)) * 10n ** 21n;
+async function walletModels() {
+  const sel = $("#wallet-model"); if (!sel) return;
+  const agents = me ? (await view("list_agents").catch(() => [])).filter((a) => a.owner === me) : [];
+  const pub = Object.keys(D.publicModels || {});
+  sel.innerHTML = [...agents.map((a) => `<option value="${esc(a.id)}">Your agent: ${esc(a.name)}</option>`), ...pub.map((m) => `<option value="${esc(m)}">${esc(modelName(m))}</option>`)].join("");
+}
+$("#wallet-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!me) return connect();
+  const f = new FormData(e.target), btn = e.target.querySelector("button[type=submit]");
+  const budget = toYocto(f.get("budget")), per = toYocto(f.get("per"));
+  if (per > budget) return toast("The most per payment can't be more than the budget.", true);
+  const { newAgentKeys } = await import("./agentkey.js");
+  const k = { ...newAgentKeys(), model: f.get("model"), owner: me };
+  // keep the keys before the wallet takes over the page; the setup key is thrown away after use
+  ls.set(PENDING, k); ls.set(KEYS(k.account), { account: k.account, spendKey: k.spendKey, model: k.model });
+  btn.setAttribute("aria-busy", "true");
+  try {
+    await sendTo([
+      [k.account, [["transfer", 2n * 10n ** 23n]]],
+      [WALLETS, [["open", { model: k.model, agent: k.account, per_spend: String(per) }, budget, "50000000000000"]]],
+    ], `${location.origin}${location.pathname}#agent`);
+    await finishWalletSetup();
+  } catch (err) { toast(plain(err), true); }
+  finally { btn.removeAttribute("aria-busy"); renderWallets(); }
+});
+async function finishWalletSetup() {
+  const k = ls.get(PENDING); if (!k) return;
+  const { setUp, keysOn } = await import("./agentkey.js");
+  for (let i = 0; i < 10; i++) {
+    try {
+      const keys = await keysOn(k.account).catch(() => null);
+      if (keys && keys.length === 1 && keys[0].permission !== "FullAccess") { ls.del(PENDING); return; }
+      if (keys) { await setUp(k); ls.del(PENDING); toast("Your agent's wallet is ready, and its account is locked to one key."); return; }
+    } catch (err) { if (i === 9) toast(`Couldn't lock the agent's account yet: ${plain(err)}`, true); }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+async function renderWallets() {
+  const box = $("#my-wallets"); if (!box) return;
+  await walletModels();
+  if (!me) { box.innerHTML = ""; return; }
+  const ws = await view("wallets_of", { owner: me }, WALLETS).catch(() => []);
+  if (!ws.length) { box.innerHTML = ""; return; }
+  const lic = await Promise.all(ws.map((w) => view("licence", { model: w.model, skill: "money" }).catch(() => null)));
+  box.innerHTML = `<h3>Your agents' wallets</h3>` + ws.map((w, i) => {
+    const keys = ls.get(KEYS(w.agent)), l = lic[i];
+    const state = w.frozen ? `<span class="stamp">FROZEN</span>` : l?.licensed ? `<span class="stamp yes">CAN PAY</span>` : `<span class="stamp">WILL FREEZE</span>`;
+    const snippet = keys ? `// your agent pays from its wallet; this key can do nothing else
+import { Account } from "@near-js/accounts";
+import { JsonRpcProvider } from "@near-js/providers";
+import { KeyPairSigner } from "@near-js/signers";
+const agent = new Account("${w.agent}", new JsonRpcProvider({ url: "${NET.rpc[0]}" }),
+  KeyPairSigner.fromSecretKey(process.env.AGENT_KEY));
+await agent.callFunction({ contractId: "${WALLETS}", methodName: "spend",
+  args: { to: "supplier.testnet", amount: "20000000000000000000000" }, gas: 70n * 10n ** 12n });` : "";
+    return `<article class="aw ${w.frozen ? "off" : ""}">
+      <div class="aw-top"><div><b>${esc(w.model.startsWith("agent:") ? w.model.split("/").pop() : modelName(w.model))}</b><small>Account <code>${esc(w.agent.slice(0, 10))}…${esc(w.agent.slice(-6))}</code></small></div>${state}</div>
+      <p class="note">${w.frozen ? `Frozen: ${esc(w.reason)}. What was left went back to you.` : `${near(w.left)} NEAR left, ${near(w.spent)} NEAR paid, up to ${near(w.per_spend)} NEAR a payment.${l && !l.licensed ? ` Its licence is off (${esc(l.reason)}), so its next payment will freeze the wallet.` : ""}`} <a href="/record?model=${encodeURIComponent(w.model)}">Licence record</a></p>
+      ${keys ? `<details><summary>Give this to your agent</summary><p class="note">The agent's key. Keep it like a password; it can only ask this wallet to pay, within the cap.</p><pre class="cmd">AGENT_ACCOUNT=${esc(w.agent)}\nAGENT_KEY=${esc(keys.spendKey)}</pre><pre class="cmd">${esc(snippet)}</pre></details>` : ""}
+      ${!w.frozen ? `<button class="link danger" type="button" data-close-wallet="${esc(w.agent)}">Close it and take the money back</button>` : ""}
+    </article>`;
+  }).join("");
+}
+$("#my-wallets")?.addEventListener("click", async (e) => {
+  const c = e.target.closest("[data-close-wallet]"); if (!c) return;
+  try { await sendTo([[WALLETS, [["close", { agent: c.dataset.closeWallet }, 0n, "30000000000000"]]]], `${location.origin}${location.pathname}#agent`); toast("Closed. The rest is on its way back to you."); }
+  catch (err) { toast(plain(err), true); }
+  renderWallets();
+});

@@ -10,9 +10,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "contract\nbudget\ngrader"
+          workspaces: "contract\nbudget\nagentwallet\ngrader"
       - run: cd contract && cargo test
       - run: cd budget && cargo test
+      - run: cd agentwallet && cargo test
       - run: cd grader && cargo test --lib
   browser-matches-contract:
     runs-on: ubuntu-latest

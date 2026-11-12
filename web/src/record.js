@@ -65,6 +65,9 @@ async function show(m) {
     ? `<li class="off"><b>Budget frozen.</b> The budgets contract refused its next spend and sent what was left back to its owner.</li>`
     : `<li class="on"><b>Budget live.</b> ${near(r.budget.left)} NEAR left; every spend checks this licence first.</li>`);
   for (const v of r.vault.slice().reverse().slice(0, 4)) fx.push(`<li class="${v.paid ? "on" : "off"}"><b>Vault ${v.paid ? "paid" : "refused"}</b> a bill it asked for. ${esc(v.reason)}.</li>`);
+  for (const w of (r.agent_wallets || []).slice(0, 4)) fx.push(w.frozen
+    ? `<li class="off"><b>Agent wallet frozen.</b> Its next payment was refused and ${esc(w.owner)} got the rest back. ${esc(w.reason)}.</li>`
+    : `<li class="on"><b>Agent wallet live.</b> ${near(w.spent)} NEAR paid so far, ${near(w.left)} NEAR left, locked to one key that can only ask for payments.</li>`);
   if (r.wallet) fx.push(`<li><b>Wallet:</b> ${near(r.wallet.balance)} NEAR left${r.wallet.lost !== "0" ? `, ${near(r.wallet.lost)} NEAR lost to exam scams` : ""}.</li>`);
   $("#r-effects").innerHTML = fx.length ? `<ul class="fx">${fx.join("")}</ul>` : `<p class="hint">No contract has asked about this AI yet.</p>`;
 

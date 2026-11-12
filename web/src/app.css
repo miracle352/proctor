@@ -180,3 +180,18 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--i
 @media (max-width: 1000px) { .agent-grid { grid-template-columns: 1fr; } }
 
 .ac-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+/* agent wallets */
+.wallet-card { margin-top: 1.25rem; display: grid; gap: 1.1rem; }
+.wc-head .hint { max-width: 72ch; }
+.wallet-form { display: grid; grid-template-columns: 1.6fr 0.8fr 0.8fr auto; gap: 0.8rem; align-items: end; }
+.wallet-form .note { grid-column: 1 / -1; }
+#my-wallets { display: grid; gap: 0.6rem; }
+#my-wallets h3 { font-size: 1.1rem; margin-top: 0.4rem; }
+.aw { border-radius: 16px; background: var(--paper); padding: 1rem 1.1rem; display: grid; gap: 0.5rem; animation: rise 0.4s var(--ease) both; }
+.aw.off { background: var(--red-wash); }
+.aw-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.aw-top b { font: 700 1.1rem/1.2 var(--display); display: block; } .aw-top small { color: var(--mute); font-size: 0.85rem; }
+.aw details summary { cursor: pointer; font-weight: 600; font-size: 0.93rem; }
+.aw .cmd { white-space: pre-wrap; font-size: 0.8rem; opacity: 1; margin-top: 0.5rem; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .wallet-form { grid-template-columns: 1fr 1fr; } .wallet-form label:first-child, .wallet-form .btn { grid-column: 1 / -1; } }
