@@ -128,6 +128,19 @@ Everything network-specific lives in `web/network.js`. The site builds for testn
 - Free-form hunts (made outside the page, without parts) can't be checked by code; for those a challenge is still decided by the contract owner.
 - A model's maker sees the questions unless the model runs in a TEE. Proctor records this; it can't prevent it.
 
+## Built at NEAR HACKATHON
+
+- **Window.** The repository was created on 11 Nov 2026 and every commit is hackathon work; there is no earlier baseline (Q-001, Q-003). Nothing here exists on another chain (Q-002).
+- **Track:** AI Security & Defense (`security`); also fits Agent Economy (`agents`).
+- **Track hints, and where they are:**
+  - *Agent security:* licences an agent must hold to move money (`contract/`), public hunts that take them away, known scams that every licence must keep passing, and two contracts that act on the licence (`vault/`, `budget/`).
+  - *TEE attestation:* every exam and hunt is marked inside OutLayer's Intel TDX enclave by a grader build pinned by hash; the sealed questions open only for that build. Qwen 3.8 answers from NEAR AI Cloud's attested TEE. What we verify ourselves and what we trust is in [What's proven, what's trusted](#whats-proven-whats-trusted).
+  - *Function-call keys:* see the licensed agent wallet below.
+- **NEAR pieces used:** NEAR smart contracts (near-sdk), yield/resume to OutLayer, OutLayer's keystore and TEE execution, NEAR AI Cloud, cross-contract calls (`vault/`, `budget/` call `licence`), NEAR wallets through wallet-selector.
+- **Libraries (Q-005).** Rust: near-sdk 5.9, serde, serde_json, sha2, hex; built with cargo-near. Web: Vite 6, @near-wallet-selector 10 (core, modal-ui, my-near-wallet, meteor-wallet, here-wallet, intear-wallet), @near-js accounts/providers/signers 2.5, @noble/curves, @noble/hashes, @noble/ciphers, buffer, Fontsource fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono, Big Shoulders Display). MCP server: @modelcontextprotocol/sdk, zod. Tools: Python 3 with the cryptography package, the outlayer CLI, near-cli-rs. No templates.
+- **AI-written code.** Much of the code was written with an AI coding assistant (Claude) and reviewed and tested by the team.
+- **Other projects (Q-015):** this is the team's only NEAR HACKATHON entry.
+
 ## Credits
 
 Hero photograph: an exam in Curzon Hall, University of Dhaka, by Azim Khan Ronnie, CC BY-SA 4.0, via Wikimedia Commons (shown in greyscale). Question templates from Apple's GSM-Symbolic. Built with AI coding assistance.
