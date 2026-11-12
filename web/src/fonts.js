@@ -1,3 +1,4 @@
+import "./menu.js";
 import "@fontsource/bricolage-grotesque/latin-600.css";
 import "@fontsource/bricolage-grotesque/latin-700.css";
 import "@fontsource/bricolage-grotesque/latin-800.css";

@@ -212,13 +212,11 @@ async function guestHunt(out, btn) {
     const s = await sealHunt({ owner: sponsor, setId, items, build: D.config.grader_version });
     store.set(KEEP(setId), s.text); addGuest(setId);
     download(`${setId}.json`, s.text);
-    say("Opening the hunt on NEAR");
-    await guestApi({ action: "open", set_id: setId, sha256: s.sha256, size: items.length, store: s.store });
+    say("Opening it and firing at every licence holder");
     const targets = D.board.filter((x) => !x.l.suspension).map((x) => x.model);
     showdown(setId, targets);
-    say("Putting it in front of every licence holder");
-    const r = await guestApi({ action: "fire", set_id: setId });
-    showdown(setId, r.fired);
+    const r = await guestApi({ action: "open", set_id: setId, sha256: s.sha256, size: items.length, store: s.store });
+    if (r.fired?.length) showdown(setId, r.fired);
     out.hidden = false; out.className = "out ok";
     out.innerHTML = `<strong>The trap is set</strong><span>${esc(setId)} is live. Sealed to OutLayer key ${esc(s.pubkey)}. Watch the AIs answer below.</span>`;
   } catch (err) {
@@ -296,7 +294,11 @@ async function readAll() {
   const agentOf = Object.fromEntries(agents.map((a) => [a.id, a]));
   const board = candidates.map((m, i) => ({ model: m, l: lic[i], wallet: wal[m]?.balance || "0" }))
     .filter((x) => x.l && (x.l.licensed || x.l.suspension));
-  return { config, hunts, suspensions, publicModels, agentOf, board, windows };
+  // how many AIs each of this browser's hunts has been put to
+  const mineIds = hunts.filter((h) => h.hunter === me || guestIds().includes(h.set_id)).map((h) => h.set_id);
+  const sets = await Promise.all(mineIds.map((id) => view("get_set", { set_id: id }).catch(() => null)));
+  const runs = Object.fromEntries(mineIds.map((id, i) => [id, sets[i]?.runs ?? 0]));
+  return { config, hunts, suspensions, publicModels, agentOf, board, windows, runs };
 }
 
 function renderTally() {
@@ -347,7 +349,10 @@ function huntCard(h, mine) {
   let actions = "";
   const guest = h.set_id.startsWith("hunt-g-");
   if (mine && guest && !h.settled) {
-    if (!h.revealed_ms && Date.now() < h.reveal_by_ms) actions += `<button class="btn primary" type="button" data-guest-reveal="${esc(h.set_id)}"><span class="dot"></span>Reveal and claim</button>`;
+    const runs = D.runs?.[h.set_id] ?? 0, young = Date.now() - h.opened_ms < 4 * 60_000;
+    if (!h.revealed_ms && runs === 0) actions += `<button class="btn primary" type="button" data-guest-fire="${esc(h.set_id)}"><span class="dot"></span>Fire it at the licence holders</button><span class="hint">It hasn't been put to any AI yet.</span>`;
+    else if (!h.revealed_ms && young) actions += `<span class="hint">The AIs are still answering. Reveal once they're done.</span>`;
+    else if (!h.revealed_ms && Date.now() < h.reveal_by_ms) actions += `<button class="btn ghost" type="button" data-guest-reveal="${esc(h.set_id)}">Reveal it to make catches final</button><span class="hint">Revealing ends the hunt. No AI can be fired at after this.</span>`;
     if (kind === "ready") actions += `<button class="btn primary" type="button" data-guest-settle="${esc(h.set_id)}"><span class="dot"></span>Settle</button>`;
   } else if (mine && !h.settled) {
     if (!h.revealed_ms && Date.now() < h.reveal_by_ms) {
@@ -434,9 +439,18 @@ function pickFile() {
 }
 
 document.addEventListener("click", async (e) => {
-  const rev = e.target.closest("[data-guest-reveal]"), set = e.target.closest("[data-guest-settle]");
-  if (!rev && !set) return;
-  const b = rev || set;
+  const rev = e.target.closest("[data-guest-reveal]"), set = e.target.closest("[data-guest-settle]"), fire = e.target.closest("[data-guest-fire]");
+  if (!rev && !set && !fire) return;
+  const b = rev || set || fire;
+  if (fire) {
+    b.setAttribute("aria-busy", "true");
+    showdown(fire.dataset.guestFire, D.board.filter((x) => !x.l.suspension).map((x) => x.model));
+    try { const r = await guestApi({ action: "fire", set_id: fire.dataset.guestFire }); if (r.fired?.length) showdown(fire.dataset.guestFire, r.fired); }
+    catch (err) { toast(plain(err), true); }
+    finally { b.removeAttribute("aria-busy"); refresh(); }
+    return;
+  }
+  if (rev && !confirm("Reveal publishes your traps and ends the hunt. Only do this after the AIs have answered. Go ahead?")) return;
   b.setAttribute("aria-busy", "true");
   try {
     if (rev) {

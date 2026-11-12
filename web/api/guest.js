@@ -100,7 +100,13 @@ async function open(acct, id, b, res) {
   const storage = BigInt(s.encrypted_secrets_base64.length + 2000) * 10n ** 19n;
   await call(acct, OUTLAYER, "store_secrets", s, storage, 100n);
   await call(acct, CONTRACT, "open_hunt", { set_id: id, sha256: sha, size, skill: SKILL }, STAKE, 50n);
-  return res.json({ ok: true });
+  // fire straight away, so a visitor who closes the tab still gets a real hunt
+  for (let i = 0; i < 6; i++) {
+    const hunt = await view("get_hunt", { set_id: id }).catch(() => null);
+    if (hunt) return fire(acct, id, hunt, res);
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  return res.json({ ok: true, fired: [], skipped: [["all", "opened, but not fired yet: press Fire on your hunt"]] });
 }
 
 async function fire(acct, id, hunt, res) {
