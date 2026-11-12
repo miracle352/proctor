@@ -37,7 +37,7 @@ function show() {
   const v = (location.hash || "#test").slice(1).split("?")[0];
   const name = ["test", "agent", "write", "check"].includes(v) ? v : "test";
   $$(".view").forEach((s) => (s.hidden = s.id !== `view-${name}`));
-  $$(".nav nav a").forEach((a) => { if (a.dataset.view !== name) a.removeAttribute("aria-current"); else a.setAttribute("aria-current", "page"); });
+  $$(".app-tabs a").forEach((a) => { if (a.dataset.view !== name) a.removeAttribute("aria-current"); else a.setAttribute("aria-current", "page"); });
 }
 addEventListener("hashchange", show);
 show();

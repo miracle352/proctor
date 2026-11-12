@@ -115,3 +115,12 @@ p { text-wrap: pretty; }
   .nav.open nav a[aria-current="page"] { color: #fff; }
   @keyframes menu-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } }
 }
+
+/* one header everywhere: four short links that never wrap */
+.nav nav a { white-space: nowrap; }
+.nav .who .chip small { white-space: nowrap; }
+.app-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; padding: 0.3rem; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--line); justify-self: start; width: fit-content; max-width: 100%; overflow-x: auto; margin-bottom: 1.6rem; }
+.app-tabs a { white-space: nowrap; text-decoration: none; color: var(--ink-2); padding: 0.55rem 1rem; border-radius: 999px; font-size: 0.95rem; transition: background 0.2s; }
+.app-tabs a:hover { background: var(--paper); }
+.app-tabs a[aria-current="page"] { background: var(--ink); color: #fff; }
+@media (max-width: 640px) { .app-tabs { flex-wrap: nowrap; border-radius: 16px; } }

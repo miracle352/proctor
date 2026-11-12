@@ -12,18 +12,22 @@
   <a class="skip" href="#main">Skip to the app</a>
   <header class="nav stuck">
     <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
-    <nav aria-label="App screens">
-      <a href="#test" data-view="test">Test an AI</a>
-      <a href="#agent" data-view="agent">License an agent</a>
-      <a href="#write" data-view="write">Write questions</a>
-      <a href="#check" data-view="check">Check a score</a>
-      <a href="/hunt">Hunt</a>
-      <a href="/record">Licence records</a>
+    <nav aria-label="Pages">
+      <a href="/hunt">Set a trap</a>
+      <a href="/record">Licences</a>
+      <a href="/app#agent" aria-current="page">Your agent</a>
+      <a href="/developers">Developers</a>
     </nav>
     <div class="who" id="who"><button class="btn primary small" id="connect" type="button"><span class="dot"></span>Connect wallet</button></div>
   </header>
 
   <main id="main" class="app-main">
+    <nav class="app-tabs" aria-label="App screens">
+      <a href="#agent" data-view="agent">License an agent</a>
+      <a href="#test" data-view="test">Test an AI</a>
+      <a href="#check" data-view="check">Check a certificate</a>
+      <a href="#write" data-view="write">Write exam questions</a>
+    </nav>
     <!-- test an AI -->
     <section class="view" id="view-test" aria-labelledby="test-h">
       <div class="view-head">
