@@ -112,5 +112,6 @@ p { text-wrap: pretty; }
   .nav .btn, .nav .who { order: 2; }
   .nav.open nav { display: grid; position: absolute; top: calc(100% + 0.4rem); left: var(--gutter); right: var(--gutter); gap: 0.2rem; padding: 0.6rem; border-radius: 20px; background: #fff; box-shadow: 0 18px 50px rgb(13 14 16 / 0.18), 0 0 0 1px rgb(13 14 16 / 0.06); animation: menu-in 0.3s var(--ease) both; }
   .nav.open nav a { font-size: 1.1rem; padding: 0.85rem 1rem; color: var(--ink); }
+  .nav.open nav a[aria-current="page"] { color: #fff; }
   @keyframes menu-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } }
 }
