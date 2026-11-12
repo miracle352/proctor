@@ -35,6 +35,12 @@ Then check the code that decides hunts:
 cd contract && cargo test   # 16 tests, including 400 browser-written hunt questions replayed byte for byte
 ```
 
+## Who it's for
+
+- **Teams running a payments agent.** Register it (a model plus its instructions), let it sit the licence exam, and from then on the public tests it for free: every trap anyone sets goes to every licence holder. Its [licence record](https://useproctor.vercel.app/record) shows each exam, each trap and each catch.
+- **Contracts that let AI move money.** One call to `licence(model, "money")` before paying. `vault/` pays bills only for licensed AIs; `budget/` gives an AI a spending budget and freezes it the moment the licence drops.
+- **Hunters, people or agents.** Set a trap on the site with no wallet, or from any agent through the MCP server in [`mcp/`](mcp/README.md): `check_licence` before paying, `check_trap` and `set_trap` to red-team.
+
 ## What's proven, what's trusted
 
 | Claim | How you can check it | What it rests on |

@@ -1,0 +1,14 @@
+{
+  "name": "proctor-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Proctor: check an AI's money licence on NEAR before letting it pay, and set traps for licensed AIs.",
+  "type": "module",
+  "bin": {
+    "proctor-mcp": "server.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  }
+}

@@ -42,3 +42,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tools/check.py
+  mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd web && npm ci && cd ../mcp && npm ci
+      # the server starts and lists its tools over stdio
+      - run: |
+          cd mcp && node -e '
+          import("@modelcontextprotocol/sdk/client/index.js").then(async ({ Client }) => {
+            const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+            const c = new Client({ name: "ci", version: "1" });
+            await c.connect(new StdioClientTransport({ command: "node", args: ["server.mjs"], env: process.env }));
+            const names = (await c.listTools()).tools.map((t) => t.name);
+            console.log(names.join(", "));
+            if (names.length !== 7) process.exit(1);
+            await c.close();
+          })'
