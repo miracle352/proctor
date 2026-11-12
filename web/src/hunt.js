@@ -284,8 +284,8 @@ function download(name, text) {
 
 /* reading the chain */
 async function readAll() {
-  const [config, hunts, suspensions, pub, agents, wallets, windows] = await Promise.all([
-    view("config"), view("list_hunts"), view("list_suspensions"), view("list_public_models"), view("list_agents"), view("list_wallets"), view("hunt_windows"),
+  const [config, hunts, suspensions, pub, agents, wallets, windows, known] = await Promise.all([
+    view("config"), view("list_hunts"), view("list_suspensions"), view("list_public_models"), view("list_agents"), view("list_wallets"), view("hunt_windows"), view("list_known").catch(() => []),
   ]);
   const publicModels = Object.fromEntries(pub);
   const candidates = [...Object.keys(publicModels), ...agents.filter((a) => publicModels[a.model]).map((a) => a.id)];
@@ -298,7 +298,7 @@ async function readAll() {
   const mineIds = hunts.filter((h) => h.hunter === me || guestIds().includes(h.set_id)).map((h) => h.set_id);
   const sets = await Promise.all(mineIds.map((id) => view("get_set", { set_id: id }).catch(() => null)));
   const runs = Object.fromEntries(mineIds.map((id, i) => [id, sets[i]?.runs ?? 0]));
-  return { config, hunts, suspensions, publicModels, agentOf, board, windows, runs };
+  return { config, hunts, suspensions, publicModels, agentOf, board, windows, runs, known };
 }
 
 function renderTally() {
@@ -315,7 +315,7 @@ function renderTally() {
     $("#wire-track").innerHTML = one.repeat(Math.max(2, Math.ceil(8 / events.length)) * 2);
     $("#wire").hidden = false;
   }
-  set("hunts", D.hunts.length); set("caught", caught); set("off", off);
+  set("hunts", D.hunts.length); set("caught", caught); set("off", off); set("known", (D.known || []).length);
   $$("[data-w=reveal]").forEach((el) => (el.textContent = hours(D.windows.reveal_ms)));
   $$("[data-w=challenge]").forEach((el) => (el.textContent = hours(D.windows.challenge_ms)));
 }
@@ -363,6 +363,11 @@ function huntCard(h, mine) {
     if (kind === "ready") actions += `<button class="btn primary" type="button" data-settle="${esc(h.set_id)}"><span class="dot"></span>Settle</button>`;
   } else if (!h.settled && kind === "ready") {
     actions += `<button class="btn ghost small" type="button" data-settle="${esc(h.set_id)}">Settle it</button>`;
+  }
+  const isKnown = (D.known || []).some(([k]) => k === `known-${h.set_id.slice(5)}`);
+  if (h.settled && !h.void && h.catches.length) {
+    actions += isKnown ? `<span class="known-tag">Known scam: every licence holder must pass it</span>`
+      : mine && store.get(KEEP(h.set_id)) ? `<button class="btn ghost small" type="button" data-known="${esc(h.set_id)}">Make it a known scam</button>` : "";
   }
   return `<article class="hunt-card ${kind}">
     <div class="h-top"><div><b>${esc(h.set_id)}</b><small>by ${esc(h.hunter)}, opened ${when(h.opened_ms)}, stake ${near(h.stake)} NEAR</small></div><span class="h-state">${esc(label)}</span></div>
@@ -427,6 +432,7 @@ document.addEventListener("click", async (e) => {
     await go([["reveal", { set_id: id, plaintext: text }, 0n, "100000000000000"]], "Revealed. Anyone can check your answer keys now.");
   } else if (set) {
     await go([["settle_hunt", { set_id: set.dataset.settle }, 0n, "100000000000000"]], "Settled.");
+    await promote(set.dataset.settle);
   }
 });
 function pickFile() {
@@ -462,9 +468,25 @@ document.addEventListener("click", async (e) => {
     } else {
       await guestApi({ action: "settle", set_id: set.dataset.guestSettle });
       toast("Settled.");
+      await promote(set.dataset.guestSettle);
     }
   } catch (err) { toast(plain(err), true); }
   finally { b.removeAttribute("aria-busy"); setTimeout(refresh, 2500); }
+});
+
+// A settled hunt that caught someone becomes a known scam every licence holder must pass.
+async function promote(id) {
+  const h = (await view("get_hunt", { set_id: id }).catch(() => null));
+  const text = store.get(KEEP(id));
+  if (!h || !h.settled || h.void || !h.catches.length || !text) return;
+  try {
+    const r = await guestApi({ action: "known", set_id: id, plaintext: text });
+    toast(`Your trap is now a known scam. Every licence holder has to pass it: ${r.fired?.length || 0} are sitting it now.`);
+  } catch (e) { if (!/already a known scam/.test(String(e.message))) toast(plain(e), true); }
+}
+document.addEventListener("click", async (e) => {
+  const k = e.target.closest("[data-known]"); if (!k) return;
+  k.setAttribute("aria-busy", "true"); await promote(k.dataset.known); k.removeAttribute("aria-busy"); refresh();
 });
 
 /* wallet */

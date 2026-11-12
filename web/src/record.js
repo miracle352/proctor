@@ -57,7 +57,7 @@ async function show(m) {
 
   const licRow = (l, title) => `<div class="lic ${l.suspension ? "off" : l.licensed ? "on" : "no"}">
     <div><b>${title}</b><small>${l.asked ? `${l.right} of ${l.asked} right, ${l.percent}%` : "Not sat yet"}${l.licensed && l.expires_ms ? `. Valid until ${new Date(l.expires_ms).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}</small></div>
-    <span>${esc(l.reason)}</span></div>`;
+    <span>${esc(l.reason)}</span>${l.known && l.known.required ? `<small class="known-line">Known scams: passed ${l.known.passed} of ${l.known.required}${l.known.paid ? `, paid ${esc(l.known.paid)}` : ""}${l.known.due.length ? `, ${l.known.due.length} still to sit` : ""}</small>` : ""}</div>`;
   $("#r-licences").innerHTML = licRow(money, "Money licence") + licRow(pro, "Money licence, hard exam");
 
   const fx = [];
@@ -71,6 +71,7 @@ async function show(m) {
   const ev = r.events.map((e, i) => {
     const what = e.kind === "hunt"
       ? (e.paid > 0 ? `<b>Paid ${esc(e.hunter)}'s trap.</b>${e.caught ? " Licence suspended." : " It wasn't licensed at the time."}` : e.failed >= e.asked ? `Didn't answer ${esc(e.hunter)}'s trap.` : `<b>Refused ${esc(e.hunter)}'s trap.</b>`)
+      : e.set.startsWith("known-") ? `Known scam from ${esc(e.set.slice(6).replace(/^g-/, "").split("-")[0])}'s catch: ${e.right === e.asked ? "<b>refused</b>" : "<b>paid it</b>"}.`
       : `${e.kind === "hard exam" ? "Hard exam" : e.kind === "wallet exam" ? "Wallet exam" : "Exam"} part ${esc(e.set.split("-").pop().toUpperCase())}: ${e.right} of ${e.asked} right${e.failed ? `, ${e.failed} unanswered` : ""}.`;
     const cls = e.kind === "hunt" ? (e.paid > 0 ? "paid" : "held") : e.right === e.asked ? "held" : "miss";
     return `<li class="${cls}" style="--i:${Math.min(i, 12)}"><span class="dot"></span><div>${what}<small><a href="/app#check?cert=${e.cert}">Certificate ${e.cert}</a></small></div></li>`;

@@ -9,6 +9,7 @@
 import { Account } from "@near-js/accounts";
 import { JsonRpcProvider } from "@near-js/providers";
 import { KeyPairSigner } from "@near-js/signers";
+import { keystoreKey, encrypt } from "../src/seal.js";
 
 export const config = { maxDuration: 60 };
 
@@ -56,6 +57,10 @@ export default async function handler(req, res) {
   const acct = sponsor();
   if (!acct) return fail(res, 503, "Guest hunts aren't switched on yet.");
   const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+  if (b.action === "known") {
+    try { return await known(acct, String(b.set_id || ""), b.plaintext, res); }
+    catch (e) { return fail(res, 400, panic(e)); }
+  }
   const id = String(b.set_id || "");
   if (!/^hunt-g-[a-z0-9]{1,16}-[a-z0-9]{6,12}$/.test(id)) return fail(res, 400, "That isn't a guest hunt id.");
   try {
@@ -109,16 +114,35 @@ async function open(acct, id, b, res) {
   return res.json({ ok: true, fired: [], skipped: [["all", "opened, but not fired yet: press Fire on your hunt"]] });
 }
 
-async function fire(acct, id, hunt, res) {
+// A settled hunt that caught a licensed AI becomes a known scam: the contract
+// checks the questions against the hunt and commits them under a new id; the
+// sponsor seals that exact text with OutLayer and puts it to every licence
+// holder. The questions are public by now, so sealing them here is fine.
+async function known(acct, huntId, plaintext, res) {
+  if (!/^hunt-[a-z0-9-]{1,58}$/.test(huntId) || typeof plaintext !== "string" || plaintext.length > 60000) return fail(res, 400, "Send the hunt id and its revealed questions.");
+  const r = await acct.callFunctionRaw({ contractId: CONTRACT, methodName: "add_known", args: { hunt_id: huntId, plaintext }, deposit: 0n, gas: 150n * TGAS, waitUntil: "INCLUDED_FINAL" });
+  const kid = `known-${huntId.slice(5)}`;
+  const text = plaintext.replace(`"set_id":"${huntId}"`, `"set_id":"${kid}"`);
+  const secrets = JSON.stringify({ PROCTOR_SET: text });
+  const config = await view("config");
+  const encrypted = encrypt(await keystoreKey(acct.accountId, kid), secrets);
+  await call(acct, OUTLAYER, "store_secrets", {
+    accessor: { Project: { project_id: PROJECT } }, profile: kid, encrypted_secrets_base64: encrypted,
+    access: { WasmHash: { hash: config.grader_version } }, vault_id: null,
+  }, BigInt(encrypted.length + 2000) * 10n ** 19n, 100n);
+  return fire(acct, kid, { set_id: kid }, res, ["money", "money-pro"]);
+}
+
+async function fire(acct, id, hunt, res, skills = [SKILL]) {
   if (hunt.revealed_ms || hunt.settled) return fail(res, 400, "This hunt is closed.");
   const set = await view("get_set", { set_id: id });
   if (set.runs > 0) return fail(res, 400, "This hunt has already been fired.");
   const [pub, agents] = await Promise.all([view("list_public_models"), view("list_agents")]);
   const fees = Object.fromEntries(pub.map(([m, v]) => [m, BigInt(v.ai_fee)]));
   const candidates = [...Object.keys(fees), ...agents.filter((a) => fees[a.model] !== undefined).map((a) => a.id)];
-  const lic = await Promise.all(candidates.map((m) => view("licence", { model: m, skill: SKILL }).catch(() => null)));
+  const lic = await Promise.all(candidates.map((m) => Promise.all(skills.map((k) => view("licence", { model: m, skill: k }).catch(() => null)))));
   const agentOf = Object.fromEntries(agents.map((a) => [a.id, a]));
-  const targets = candidates.filter((m, i) => lic[i]?.licensed);
+  const targets = candidates.filter((m, i) => lic[i].some((l) => l?.licensed));
   const n = BigInt(set.size);
   const sent = [], skipped = [];
   for (const m of targets) {

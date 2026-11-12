@@ -68,3 +68,4 @@
 .rec-use .tabs { max-width: 100%; overflow-x: auto; }
 .rec-use .tabs button { white-space: nowrap; }
 @media (max-width: 560px) { .rec-use .tabs button { padding: 0.5rem 0.75rem; font-size: 0.9rem; } }
+.known-line { margin-top: 0.2rem; font-weight: 600; color: var(--ink-2) !important; }
