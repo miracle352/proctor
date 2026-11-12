@@ -1,0 +1,44 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "contract\nbudget\ngrader"
+      - run: cd contract && cargo test
+      - run: cd budget && cargo test
+      - run: cd grader && cargo test --lib
+  browser-matches-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contract
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd web && npm ci
+      # fresh random cases every run, written by web/src/case.js, replayed by contract/src/case.rs
+      - run: node tools/case_fixtures.mjs contract/tests/fixtures/cases.json
+      - run: cd contract && cargo test case
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd web && npm ci && npm run build
+  live-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/check.py
