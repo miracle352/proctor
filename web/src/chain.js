@@ -8,15 +8,33 @@ export const RPC = "https://rpc.testnet.fastnear.com";
 export const EXPLORER = "https://testnet.nearblocks.io";
 export const YOCTO = 10n ** 24n;
 
+// A public node can throttle or drop a request; try the next one before giving up.
+const NODES = [RPC, "https://test.rpc.fastnear.com", "https://rpc.testnet.near.org", "https://near-testnet.drpc.org"];
+let good = 0;
 async function rpc(method, params) {
-  const res = await fetch(RPC, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  const j = await res.json();
-  if (j.error) throw new Error(j.error.data || j.error.message || "RPC error");
-  return j.result;
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
+  let last;
+  for (let k = 0; k < NODES.length * 2; k++) {
+    const i = (good + k) % NODES.length;
+    try {
+      const res = await fetch(NODES[i], { method: "POST", headers: { "content-type": "application/json" }, body });
+      if (res.status === 429 || res.status >= 500) throw new Error(`node busy (${res.status})`);
+      const j = await res.json();
+      if (j.error) {
+        const msg = j.error.data || j.error.message || "RPC error";
+        // a real contract error is the same on every node
+        if (typeof msg === "string" && /panicked|does not exist|MethodNotFound|wasm execution/i.test(msg)) throw Object.assign(new Error(msg), { final: true });
+        throw new Error(msg);
+      }
+      good = i;
+      return j.result;
+    } catch (e) {
+      if (e.final) throw e;
+      last = e;
+      if (k >= NODES.length - 1) await new Promise((r) => setTimeout(r, 400 * (k - NODES.length + 2)));
+    }
+  }
+  throw last;
 }
 
 export async function view(method, args = {}, account = CONTRACT) {
