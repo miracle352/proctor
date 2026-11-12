@@ -178,3 +178,9 @@ body:not(.has-wallet) .wallet-only, body.has-wallet .guest-only { display: none;
 .rec-link:hover, .rec-link:focus-visible { background-size: 100% 2px; }
 
 .known-tag { font-size: 0.88rem; padding: 0.35rem 0.75rem; border-radius: 999px; background: var(--night); color: var(--green); }
+
+.verdicts { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.verdicts li { font-size: 0.85rem; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--paper); }
+.verdicts li.refused { background: var(--green-wash); color: var(--green-ink); }
+.verdicts li.paid { background: var(--red-wash); color: var(--red-ink); }
+.verdicts li b { font-weight: 600; }

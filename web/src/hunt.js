@@ -220,6 +220,9 @@ async function guestHunt(out, btn) {
     out.hidden = false; out.className = "out ok";
     out.innerHTML = `<strong>The trap is set</strong><span>${esc(setId)} is live. Sealed to OutLayer key ${esc(s.pubkey)}. Watch the AIs answer below.</span>`;
   } catch (err) {
+    // nothing was opened, so there is nothing to watch
+    if (SD) { clearTimeout(SD.t); SD = null; } $("#showdown").hidden = true;
+    try { localStorage.removeItem(SDKEY); } catch {}
     out.hidden = false; out.className = "out bad"; out.innerHTML = `<strong>Not opened</strong><span>${esc(plain(err))}</span>`;
   } finally { btn.removeAttribute("aria-busy"); btn.innerHTML = `<span class="dot"></span>Seal it and set the trap`; refresh(); }
 }
@@ -227,7 +230,10 @@ async function guestHunt(out, btn) {
 /* exposed so a finished hunt can be replayed from the console */
 window.proctorShowdown = (id, targets) => showdown(id, targets);
 
-/* the showdown: every AI the hunt was fired at, live until each has answered */
+/* the showdown: every AI the hunt was fired at, live until each has answered.
+   It survives a redraw and a page refresh: answers come from certificates on
+   NEAR, so the panel can always be rebuilt from the chain. */
+const SDKEY = "proctor.showdown";
 let SD = null;
 function showdown(setId, targets) {
   const box = $("#showdown");
@@ -236,46 +242,52 @@ function showdown(setId, targets) {
     SD = { id: setId, started: Date.now(), done: {} };
     box.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
-  SD.targets = targets;
-  $("#sd-list").innerHTML = targets.map((m, i) => `<li class="sd-row wait" data-m="${esc(m)}" style="--i:${i}">
+  if (targets?.length) SD.targets = targets;
+  try { localStorage.setItem(SDKEY, JSON.stringify({ id: SD.id, started: SD.started, targets: SD.targets })); } catch {}
+  $("#sd-list").innerHTML = SD.targets.map((m, i) => `<li class="sd-row wait" data-m="${esc(m)}" style="--i:${i}">
       <div class="sd-name"><b>${esc(nameOf(m))}</b><small>${esc(whoOf(m))}</small></div>
       <div class="sd-track" aria-hidden="true"><span class="sd-bar"></span><span class="sd-coin"></span></div>
       <span class="sd-verdict">Reading your request</span>
     </li>`).join("");
+  paintShowdown();
   clearTimeout(SD.t); pollShowdown();
+}
+const paid = (c) => c.asked - c.correct - c.failures;
+function paintShowdown() {
+  for (const row of $$("#sd-list .sd-row")) {
+    const c = SD.done[row.dataset.m];
+    if (!c || !row.classList.contains("wait")) continue;
+    row.classList.remove("wait");
+    if (paid(c) > 0) { row.classList.add("caught"); row.querySelector(".sd-verdict").innerHTML = `<b>Paid ${paid(c)} of ${c.asked}.</b> Licence suspended`; }
+    else if (c.failures === c.asked) { row.classList.add("quiet"); row.querySelector(".sd-verdict").textContent = "Didn't answer. Its fee comes back"; }
+    else { row.classList.add("safe"); row.querySelector(".sd-verdict").innerHTML = `<b>Refused ${c.correct === c.asked ? "every one" : `${c.correct} of ${c.asked}`}.</b> Still licensed`; }
+  }
 }
 async function pollShowdown() {
   if (!SD) return;
   try {
     const { certificates: n } = await view("config");
-    const certs = (await view("get_certificates", { from: Math.max(0, n - 60), limit: 60 })).filter((c) => c.set_id === SD.id);
-    for (const c of certs) {
-      if (SD.done[c.model]) continue;
-      SD.done[c.model] = c;
-      const row = $(`#sd-list [data-m="${CSS.escape(c.model)}"]`);
-      if (!row) continue;
-      const paid = c.asked - c.correct - c.failures;
-      row.classList.remove("wait");
-      if (paid > 0) {
-        row.classList.add("caught");
-        row.querySelector(".sd-verdict").innerHTML = `<b>Paid ${paid} of ${c.asked}.</b> Licence suspended`;
-      } else if (c.failures === c.asked) {
-        row.classList.add("quiet");
-        row.querySelector(".sd-verdict").textContent = "Didn't answer. Its fee comes back";
-      } else {
-        row.classList.add("safe");
-        row.querySelector(".sd-verdict").innerHTML = `<b>Refused ${c.correct === c.asked ? "every one" : `${c.correct} of ${c.asked}`}.</b> Still licensed`;
-      }
-    }
+    for (const c of (await view("get_certificates", { from: Math.max(0, n - 120), limit: 120 })).filter((c) => c.set_id === SD.id)) SD.done[c.model] ||= c;
   } catch {}
+  paintShowdown();
   const left = SD.targets.filter((m) => !SD.done[m]).length;
-  const caught = Object.values(SD.done).filter((c) => c.asked - c.correct - c.failures > 0).length;
-  $("#sd-h").textContent = left ? "Your scam is in front of them now" : caught ? `You caught ${caught} licensed AI${caught > 1 ? "s" : ""}` : "Every AI refused it. Try a quieter trick";
-  $("#sd-sub").textContent = left ? `${left} still deciding. Each one reads your request inside OutLayer's secure hardware; this takes one to three minutes.`
-    : caught ? "Their licences are suspended on NEAR now, and the money they paid is held for you. Reveal your hunt within the window to make it final." : "The best catches break one rule quietly: a swapped digit, a bank change late in a thread, an approval for a different amount.";
-  if (left && Date.now() - SD.started < 8 * 60_000) SD.t = setTimeout(pollShowdown, 6000);
-  else refresh();
+  const caught = Object.values(SD.done).filter((c) => paid(c) > 0).length;
+  const secs = Math.round((Date.now() - SD.started) / 1000), clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  $("#sd-h").textContent = left ? "Your trap is in front of them now" : caught ? `You caught ${caught} licensed AI${caught > 1 ? "s" : ""}` : "Every AI refused it. Try a quieter trick";
+  $("#sd-sub").textContent = left
+    ? `${left} still deciding, ${clock} so far. Each one reads your request inside OutLayer's secure hardware; most answer within a minute. You can leave: the verdicts also land on your hunt below.`
+    : caught ? "Their licences are suspended on NEAR now, and the money they paid is held for you. Reveal your hunt to make it final." : "The best catches break one rule quietly: a swapped digit, a bank change late in a thread, an approval for a different amount.";
+  if (left && Date.now() - SD.started < 15 * 60_000) SD.t = setTimeout(pollShowdown, 5000);
+  else { try { localStorage.removeItem(SDKEY); } catch {} refresh(); }
 }
+// back after a refresh: pick the showdown up where it was
+try {
+  const saved = JSON.parse(localStorage.getItem(SDKEY) || "null");
+  if (saved && Date.now() - saved.started < 15 * 60_000 && saved.targets?.length) {
+    SD = { id: saved.id, started: saved.started, done: {}, targets: saved.targets };
+    setTimeout(() => showdown(saved.id, saved.targets), 0);
+  }
+} catch {}
 function download(name, text) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type: "application/json" })); a.download = name;
@@ -298,7 +310,11 @@ async function readAll() {
   const mineIds = hunts.filter((h) => h.hunter === me || guestIds().includes(h.set_id)).map((h) => h.set_id);
   const sets = await Promise.all(mineIds.map((id) => view("get_set", { set_id: id }).catch(() => null)));
   const runs = Object.fromEntries(mineIds.map((id, i) => [id, sets[i]?.runs ?? 0]));
-  return { config, hunts, suspensions, publicModels, agentOf, board, windows, runs, known };
+  const n = config.certificates;
+  const recent = (await Promise.all([0, 1, 2].map((p) => view("get_certificates", { from: Math.max(0, n - (p + 1) * 100), limit: 100 }).catch(() => [])))).flat();
+  const answers = {};
+  for (const c of recent) if (c.set_id.startsWith("hunt-")) (answers[c.set_id] ||= {})[c.model] ||= c;
+  return { config, hunts, suspensions, publicModels, agentOf, board, windows, runs, known, answers };
 }
 
 function renderTally() {
@@ -345,7 +361,9 @@ const stateOf = (h, set) => {
 
 function huntCard(h, mine) {
   const [label, kind] = stateOf(h);
-  const catches = h.catches.length ? `<ul class="catches">${h.catches.map((c) => `<li><b>${esc(nameOf(c.model))}</b> paid. ${near(c.amount)} NEAR held. <a href="/app#check?cert=${c.cert_id}">Certificate ${c.cert_id}</a></li>`).join("")}</ul>` : `<p class="hint">Nobody caught yet.</p>`;
+  const ans = Object.values(D.answers?.[h.set_id] || {});
+  const verdicts = ans.length ? `<ul class="verdicts">${ans.map((c) => `<li class="${paid(c) > 0 ? "paid" : c.failures === c.asked ? "quiet" : "refused"}"><b>${esc(nameOf(c.model))}</b> ${paid(c) > 0 ? "paid" : c.failures === c.asked ? "didn't answer" : "refused"}</li>`).join("")}</ul>` : "";
+  const catches = h.catches.length ? `<ul class="catches">${h.catches.map((c) => `<li><b>${esc(nameOf(c.model))}</b> paid. ${near(c.amount)} NEAR held. <a href="/app#check?cert=${c.cert_id}">Certificate ${c.cert_id}</a></li>`).join("")}</ul>` : ans.length ? "" : `<p class="hint">No AI has answered yet.</p>`;
   let actions = "";
   const guest = h.set_id.startsWith("hunt-g-");
   if (mine && guest && !h.settled) {
@@ -371,6 +389,7 @@ function huntCard(h, mine) {
   }
   return `<article class="hunt-card ${kind}">
     <div class="h-top"><div><b>${esc(h.set_id)}</b><small>by ${esc(h.hunter)}, opened ${when(h.opened_ms)}, stake ${near(h.stake)} NEAR</small></div><span class="h-state">${esc(label)}</span></div>
+    ${verdicts}
     ${catches}
     ${actions ? `<div class="h-actions">${actions}</div>` : ""}
   </article>`;
