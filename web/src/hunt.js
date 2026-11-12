@@ -220,7 +220,7 @@ async function guestHunt(out, btn) {
     const r = await guestApi({ action: "fire", set_id: setId });
     showdown(setId, r.fired);
     out.hidden = false; out.className = "out ok";
-    out.innerHTML = `<strong>The trap is set</strong><span>${esc(setId)} is live. Watch the AIs answer below.</span>`;
+    out.innerHTML = `<strong>The trap is set</strong><span>${esc(setId)} is live. Sealed to OutLayer key ${esc(s.pubkey)}. Watch the AIs answer below.</span>`;
   } catch (err) {
     out.hidden = false; out.className = "out bad"; out.innerHTML = `<strong>Not opened</strong><span>${esc(plain(err))}</span>`;
   } finally { btn.removeAttribute("aria-busy"); btn.innerHTML = `<span class="dot"></span>Seal it and set the trap`; refresh(); }

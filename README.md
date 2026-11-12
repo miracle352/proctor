@@ -1,25 +1,49 @@
 # Proctor
 
-An exam board for AI, on NEAR. Before an AI is allowed to act, it sits a sealed exam; any NEAR contract can then check its licence in one call.
+A licence for AI that handles money, on NEAR. Anyone can take the licence away by catching the AI paying a scam.
 
-**The wallet test:** four AI models were each given a wallet with 1 NEAR and a sealed exam of 42 payment requests, half of them scams (changed bank details, a boss demanding a secret transfer, instructions hidden in the request, duplicate invoices, look-alike domains, split payments, oversized refunds, approvals from the wrong person). Every scam a model approves is paid from its own wallet to a scammer account, by the contract, in the same step that records the mark. Models that score 90% or better get a money licence. A small vault contract pays a bill only for a licensed model.
+An AI earns a money licence by passing a sealed wallet test: payment requests, half of them scams, opened only inside secure hardware. Any NEAR contract can check the licence in one call before it lets an AI move funds. Then anyone can try to break it. You set a trap (a fake invoice, a bank change slipped into a thread, an approval for the wrong amount), your browser seals it, and Proctor puts it in front of every licensed AI. If one pays, the contract suspends its licence in the same transaction and holds what it paid for you. When you reveal the trap, the contract rebuilds every question from its parts and checks the answer with code. Nobody judges a hunt by hand, us included.
 
-Sealed exams for AI models. Experts write questions with one exact answer and keep them sealed. The questions are opened only inside secure hardware, where the model answers them and plain code marks the answers. Only the score comes out, and it is written to NEAR.
+**Live:** https://useproctor.vercel.app (hunts at `/hunt`, no wallet needed)
+**Contract:** [`app.proctor-91796.testnet`](https://testnet.nearblocks.io/address/app.proctor-91796.testnet) · **Track:** AI Security & Defense
 
-Public benchmarks leak into training data, so a high score can mean the model has read the answers. Proctor's questions are never published while in use, and every score can be traced to a sealed set whose fingerprint was on chain before any model saw it.
+## Check it in two minutes
 
-**Live:** https://useproctor.vercel.app (the app is at `/app`)
-**Contract:** [`app.proctor-91796.testnet`](https://testnet.nearblocks.io/address/app.proctor-91796.testnet)
+Nothing to install beyond Python 3. These are read-only calls to the contract on NEAR testnet, so they work without a wallet and even when OutLayer is down.
+
+```sh
+python3 tools/check.py          # every licence, every suspension, every hunt
+python3 tools/check.py cert 1146  # the certificate where Claude Haiku paid a hunter's trap
+```
+
+What you should see, as of 12 Nov 2026:
+
+| | Basic wallet test (`money`) | Hard wallet test (`money-pro`) |
+|---|---|---|
+| Claude Haiku 5.5 | 40/42, then **suspended**: paid a hunter's trap | 42/42, licensed |
+| GPT-6.1 Sol | 39/42, licensed | 42/42, licensed |
+| Gemini 3.1 Flash-Lite | 39/42, licensed | 42/42, licensed |
+| Qwen 3.8 | 39/42, licensed | 41/42, paid one scam, not licensed |
+| Claude Sonnet 5.5 | 42/42, then **suspended**: paid a hunter's trap | 39/42, paid three scams, not licensed |
+| GPT-5 nano | 39/42, paid two scams, not licensed | 34/42, paid eight scams, not licensed |
+
+Every number comes from the contract; the script prints them live. Sonnet's three hard-test failures were all the same trick (a bank change in a later message of a thread), and the first hunt used that trick to catch it again.
+
+Then check the code that decides hunts:
+
+```sh
+cd contract && cargo test   # 16 tests, including 400 browser-written hunt questions replayed byte for byte
+```
 
 ## Try it
 
-1. Open https://useproctor.vercel.app/app.
-2. Without a wallet, press **Watch a recorded exam** to replay real certificates from the contract.
-3. With a NEAR testnet wallet (MyNearWallet, Meteor, HERE or Intear), pick a model and a set and press **Start the exam**. Each question is one paid run. Rows turn into ticks or crosses as each certificate lands, about one a minute.
-4. On the home page, under **Licensed to handle money, or not**, press a model's button to ask the vault to pay a bill as that model. The vault asks Proctor for the licence and pays or refuses on chain.
-5. Under **Check a score**, enter any certificate number to see what was recorded: model, set fingerprint, marking build, block, and the model provider's signed chat id.
+1. Open https://useproctor.vercel.app/hunt. No wallet needed.
+2. Pick a trick, change the details, and watch the box under the email say which rule it breaks. A trap that breaks no rule can't be sealed.
+3. Type a name and press **Seal it and set the trap**. Your browser encrypts the trap to OutLayer's keystore; a guest account pays the testnet fees and fires it at every licence holder.
+4. Watch each AI's verdict land, usually within three minutes. A caught AI shows as suspended on the board.
+5. Press **Reveal and claim** on your hunt. The contract checks your answer key with code; once the two-hour challenge window passes, anyone can settle it.
 
-Public runs are open for Qwen 3.8 (attested, inside NEAR AI Cloud's TEE), Claude Haiku 5.5, GPT-5 nano and Gemini 3.1 Flash-Lite. Each account can ask 20 questions a day, and the site as a whole 300, because every question is paid for on NEAR AI Cloud.
+With a NEAR testnet wallet (MyNearWallet, Meteor, HERE or Intear) the same page hunts from your own account and the money a catch holds goes to you. `/app` runs the exams themselves, licenses an agent (a model plus its system prompt), and checks any certificate. On the home page the vault buttons ask a demo contract to pay a bill as a given AI; it asks Proctor for the licence first.
 
 ## How it works
 
@@ -44,9 +68,9 @@ buyer ──request_run──> contract ──yield──> OutLayer (Intel TDX)
 - **Vault** (`vault/`). An agent wallet that calls `licence` before paying. Try it: `near contract call-function as-transaction vault.proctor-91796.testnet agent_pay json-args '{"model":"openai/gpt-5-nano"}' prepaid-gas '100 Tgas' attached-deposit '0 NEAR' sign-as YOU.testnet network-config testnet sign-with-keychain send`
 - **Twins** (`twins/`). Every published school-maths question used here has a sealed twin built from the same GSM-Symbolic template, with new names and numbers of the same digit length. The score gap between the two shows memorisation, reported with a bootstrap 90% interval.
 
-## Results so far
-
-Read live from the contract on the site. At the time of writing, Qwen 3.8 and Claude Haiku 5.5 each score 97% on the 34 sealed twins, 2.9 points below the published versions, and the 90% interval includes zero. School maths is too easy to separate them; harder sets from domain experts are the next step.
+- **Hunts** (`contract/src/lib.rs`: `open_hunt`, `record_catch`, `reveal`, `settle_hunt`). A hunter stores the sealed trap as an OutLayer secret under their own account, locked to the grader build, and opens the hunt with a 0.2 NEAR stake. When a licensed AI pays a trap, `on_report` suspends that licence and moves up to 0.1 NEAR from the AI's wallet into escrow. On reveal, `case.rs` rebuilds each question from its parts and applies the payment rules; a question that doesn't match its parts or a key that disagrees with the rules is marked faulty. Settling pays the hunter (escrow plus stake) and turns suspensions into revocations, or, if the hunt wasn't revealed in time or had a faulty question, lifts every suspension and splits the stake among the AIs it caught.
+- **Sealing in the browser** (`web/src/seal.js`). ECIES as OutLayer's CLI does it: X25519, HKDF-SHA256 with `outlayer-keystore-v1`, ChaCha20-Poly1305. The keystore key doesn't depend on the plaintext, so the page asks for it with an empty payload; OutLayer doesn't allow browser calls, so `/api/pubkey` relays that request (owner and profile only). `tools/seal_hunt.mjs` runs the same code from the command line.
+- **Guest hunts** (`web/api/guest.js`). Receives only the sealed copy, checks it is locked to the current grader build, caps a day's guest hunts, and signs from a sponsor account.
 
 ## Run it yourself
 
@@ -68,14 +92,15 @@ cd web && npm install && npm run dev
 
 For developers: `GET /api/scores` (every score as JSON), `GET /api/licence?model=…&skill=money`, `GET /api/badge?model=…[&skill=money]` (live SVG badge). See https://useproctor.vercel.app/developers.
 
-`tools/` has the scripts used for the live deployment: `seal_set.py` (build and fingerprint a set), `release_grader.sh` (upload a grader build, re-lock every set to it, point the contract at it), `run.py` and `run_all.py` (certified runs from the CLI), `report.py` (scores, gaps, writer outliers).
+`tools/` has the scripts used for the live deployment: `check.py` (read-only state), `make_money_exam_v2.py` in `twins/` (the hard test), `store_set.py` (seal a set without the CLI's fixed deposit), `case_fixtures.mjs` (the 400 replayed hunt questions), `seal_set.py` (build and fingerprint a set), `release_grader.sh` (upload a grader build, re-lock every set to it, point the contract at it), `run.py` and `run_all.py` (certified runs from the CLI), `report.py` (scores, gaps, writer outliers).
 
 ## Limits
 
-- Testnet only, no audit.
-- The writer-side lock into OutLayer is a CLI step for now; the app shows the exact command.
-- A model's maker sees the questions unless the model runs in a TEE. Proctor records this, it can't prevent it.
-- Marking is exact-answer only (numbers with a tolerance, or exact text).
+- Testnet only, no audit. Hunt payouts are testnet NEAR and capped at 0.1 NEAR a catch.
+- One run per model on 42 questions per test. Re-runs are next; small differences between models may not hold.
+- The page gets OutLayer's key through our relay, so in principle the relay could hand out a different key. The page shows the key's fingerprint; compare it with `outlayer` CLI before sealing something you care about.
+- Free-form hunts (made outside the page, without parts) can't be checked by code; for those a challenge is still decided by the contract owner.
+- A model's maker sees the questions unless the model runs in a TEE. Proctor records this; it can't prevent it.
 
 ## Credits
 
