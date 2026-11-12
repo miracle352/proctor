@@ -22,7 +22,7 @@ const TGAS = 10n ** 12n;
 const NEAR = 10n ** 24n;
 const STAKE = 2n * 10n ** 23n;
 const EXEC = 25n * 10n ** 21n;
-const PER_DAY = 20;
+const PER_DAY = 40;
 const NODES = NET.rpc;
 
 const provider = new JsonRpcProvider({ url: NODES[0] });
