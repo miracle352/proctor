@@ -2,7 +2,7 @@ import { NET } from "../network.js";
 import "./fonts.js";
 import "./base.css";
 import "./landing.css";
-import { VAULT, txEvents, load, modelName, makerName, setLabel, isTwin, isOriginal, isHard, short, near, esc, $, $$, still, wait, LOGO, ICON, countUp, EXPLORER } from "./chain.js";
+import { view, VAULT, txEvents, load, modelName, makerName, setLabel, isTwin, isOriginal, isHard, short, near, esc, $, $$, still, wait, LOGO, ICON, countUp, EXPLORER } from "./chain.js";
 import PUBLISHED from "./published.json";
 
 $$(".logo-slot, .env-seal").forEach((el) => (el.innerHTML = LOGO));
@@ -332,7 +332,7 @@ function problem(fixed) {
   const a = fixed ? 4 : rnd(3, 9), b = fixed ? 12 : rnd(11, 19), c = fixed ? 9 : rnd(2, 9);
   return `<mark>${name}</mark> buys <mark>${a}</mark> ${box} of <mark>${b}</mark> ${item} and gives away <mark>${c}</mark>. How many ${item} does ${pr} have left? <span class="ans">Answer: <mark>${a * b - c}</mark></span>`;
 }
-$("#q-pub").innerHTML = problem(true);
+if ($("#q-pub")) $("#q-pub").innerHTML = problem(true);
 async function twinLoop() {
   for (;;) {
     $("#q-twin").innerHTML = problem(false);
@@ -340,7 +340,7 @@ async function twinLoop() {
     await wait(still ? 1e9 : 2600);
   }
 }
-twinLoop();
+if ($("#q-twin")) twinLoop();
 
 /* scores */
 function renderBoard() {
@@ -374,20 +374,24 @@ function renderBoard() {
   $("#badges").innerHTML = ms.slice(0, 3).map((m, i) => `<img style="--i:${i}" src="/api/badge?model=${encodeURIComponent(m.model)}" alt="${esc(modelName(m.model))} score on sealed exams">`).join("");
 }
 
-function renderStats() {
-  $("#live-count").textContent = `An exam board for AI. ${D.certs.length.toLocaleString()} answers marked on NEAR so far.`;
-  countUp($("#paid"), Number(D.paid / 10n ** 21n) / 1000, { decimals: 3 });
-  countUp($("#asked"), D.certs.reduce((a, c) => a + c.asked, 0));
-  countUp($("#makers"), new Set(D.certs.map((c) => makerName(c.model))).size);
+async function renderStats() {
+  const hunts = await view("list_hunts").catch(() => []);
+  const caught = hunts.reduce((n, h) => n + h.catches.length, 0);
+  $("#live-count").textContent = `Read live from NEAR: ${D.certs.length.toLocaleString()} answers marked${caught ? `, ${caught} AIs caught by hunters` : ""}`;
+  for (const [id, v, o] of [["#paid", Number(D.paid / 10n ** 21n) / 1000, { decimals: 3 }], ["#asked", D.certs.reduce((a, c) => a + c.asked, 0)], ["#makers", new Set(D.certs.map((c) => makerName(c.model))).size]])
+    if ($(id)) countUp($(id), v, o);
 }
 
 (async () => {
   setStep(0);
   try { D = await load(); } catch (err) {
     $("#live-count").textContent = "Couldn't reach NEAR just now";
-    $("#board").innerHTML = `<p class="fail">Couldn't read the contract (${esc(err.message)}). Reload to try again.</p>`;
+    if ($("#board")) $("#board").innerHTML = `<p class="fail">Couldn't read the contract (${esc(err.message)}). Reload to try again.</p>`;
     return;
   }
-  renderStats(); renderTicker(); renderBoard(); fillStageData(); renderWallets(); renderLicences(); renderAgents();
-  windowLoop();
+  // live licence badges: they change colour the moment an AI is caught
+  if ($("#badges")) $("#badges").innerHTML = ["openai/gpt-6.1-sol", "Qwen/Qwen3.8-27B", "anthropic/claude-sonnet-5-5"].map((m, i) =>
+    `<a href="/record?model=${encodeURIComponent(m)}"><img style="--i:${i}" src="/api/badge?model=${encodeURIComponent(m)}&skill=money" alt="${esc(modelName(m))} money licence"></a>`).join("");
+  renderStats(); renderTicker(); if ($("#board")) renderBoard(); fillStageData(); renderWallets(); renderLicences(); renderAgents();
+  if ($("#ps-q")) windowLoop();
 })();
