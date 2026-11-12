@@ -208,3 +208,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--i
 .proof-rows span { color: #4a5149; font-size: 0.9rem; overflow-wrap: anywhere; }
 @keyframes proof-in { from { opacity: 0; transform: translateX(-8px); } }
 @media (prefers-reduced-motion: reduce) { .proof-rows li { animation: none; } }
+.proof p.note { display: block; }
+.proof p.note a { color: var(--blue); }
+@media (max-width: 560px) { .proof { margin-inline: -0.4rem; padding: 0.9rem 0.8rem; } .proof-rows li { column-gap: 0.5rem; } }
