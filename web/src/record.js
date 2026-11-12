@@ -78,7 +78,7 @@ async function show(m) {
       : e.set.startsWith("known-") ? `Known scam from ${esc(e.set.slice(6).replace(/^g-/, "").split("-")[0])}'s catch: ${e.right === e.asked ? "<b>refused</b>" : "<b>paid it</b>"}.`
       : `${e.kind === "hard exam" ? "Hard exam" : e.kind === "wallet exam" ? "Wallet exam" : "Exam"} part ${esc(e.set.split("-").pop().toUpperCase())}: ${e.right} of ${e.asked} right${e.failed ? `, ${e.failed} unanswered` : ""}.`;
     const cls = e.kind === "hunt" ? (e.paid > 0 ? "paid" : "held") : e.right === e.asked ? "held" : "miss";
-    return `<li class="${cls}" style="--i:${Math.min(i, 12)}"><span class="dot"></span><div>${what}<small><a href="/app#check?cert=${e.cert}">Certificate ${e.cert}</a></small></div></li>`;
+    return `<li class="${cls}" style="--i:${Math.min(i, 12)}"><span class="dot"></span><div>${what}<small><a href="/app#check?cert=${e.cert}">Certificate ${e.cert}</a> · <a href="/app#check?cert=${e.cert}&proof">Hardware proof</a></small></div></li>`;
   });
   $("#r-events").innerHTML = ev.join("") || `<li class="hint">Nothing yet.</li>`;
 

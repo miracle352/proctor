@@ -20,3 +20,4 @@ crosscheck:
 
 chain:
 	python3 tools/check.py
+	node tools/proof_check.mjs

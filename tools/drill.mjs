@@ -1,6 +1,7 @@
 // Proctor's own drills. Every run:
-//   1. settles earlier drills whose challenge window has passed, and turns any
-//      drill that caught an AI into a known scam;
+//   1. settles every hunt that is ready (revealed and past its challenge
+//      window, or never revealed and past its reveal deadline, which voids it
+//      and refunds), and turns any drill that caught an AI into a known scam;
 //   2. opens a new drill: two fresh traps generated from the tricks that have
 //      caught AIs before, sealed here and fired at every licence holder;
 //   3. waits for the answers and reveals the drill, so the contract checks its
@@ -51,10 +52,12 @@ export function drillItems(id, author) {
 async function settleOld(sponsor, windows) {
   const now = Date.now();
   for (const h of await view("list_hunts")) {
-    if (!h.set_id.startsWith("hunt-g-drill-") || h.settled || !h.revealed_ms || now < h.revealed_ms + windows.challenge_ms) continue;
-    try { await guest({ action: "settle", set_id: h.set_id }); say("settled", h.set_id); }
+    if (h.settled || !h.set_id.startsWith("hunt-g-")) continue;
+    const ready = h.revealed_ms ? now >= h.revealed_ms + windows.challenge_ms : now > h.reveal_by_ms;
+    if (!ready) continue;
+    try { await guest({ action: "settle", set_id: h.set_id }); say(h.revealed_ms ? "settled" : "voided (never revealed)", h.set_id); }
     catch (e) { say("settle failed", h.set_id, e.message); continue; }
-    if (h.catches.length) {
+    if (h.catches.length && h.set_id.startsWith("hunt-g-drill-") && h.revealed_ms) {
       try {
         const r = await guest({ action: "known", set_id: h.set_id, plaintext: setText(h.set_id, drillItems(h.set_id, sponsor)) });
         say("known scam from", h.set_id, "fired at", r.fired);

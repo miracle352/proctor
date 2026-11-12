@@ -485,6 +485,7 @@ async function lookup(id) {
       <div class="cert-score">${c.correct}<small>of ${c.asked}</small></div></div>
     <div class="cert-marks">${marks}</div>
     <ul class="checks">${checks.map(([ok, t]) => `<li class="${ok ? "ok" : "warn"}">${t}</li>`).join("")}</ul>
+    ${c.sealed ? `<div class="proof" id="proof"><button type="button" class="btn" id="proof-btn" data-cert="${c.id}">Check the hardware proof</button><p class="note">Pulls Intel's signed quote for this run and recomputes every hash here in your browser.</p></div>` : ""}
     <dl class="facts">
       <dt>Recorded in block</dt><dd><a href="${EXPLORER}/blocks/${c.block_height}" target="_blank" rel="noopener">${c.block_height.toLocaleString()}</a></dd>
       <dt>Asked by</dt><dd>${esc(c.requester)}</dd>
@@ -495,6 +496,22 @@ async function lookup(id) {
     </dl>
   </article>`;
 }
+$("#cert-out").addEventListener("click", async (e) => {
+  const b = e.target.closest("#proof-btn");
+  if (!b) return;
+  const box = $("#proof");
+  box.innerHTML = `<p class="note"><span class="spin"></span> Finding OutLayer's result for this run and the quote from the machine that produced it. About ten seconds.</p>`;
+  try {
+    const { prove } = await import("./proof.js");
+    const { proof, rows } = await prove(+b.dataset.cert);
+    const all = rows.every((r) => r.ok);
+    box.innerHTML = `<h4>${all ? "The hardware proof holds" : "The hardware proof doesn't hold"}</h4>
+      <ol class="proof-rows">${rows.map((r, i) => `<li class="${r.ok ? "ok" : "bad"}" style="--i:${i}"><b>${esc(r.title)}</b><span>${esc(r.detail)}</span></li>`).join("")}</ol>
+      <p class="note">One step is left to Intel: that the quote is signed by a genuine TDX chip. <a href="${proof.outlayer_verifier}" target="_blank" rel="noopener">Check the signature on OutLayer's verifier</a>, which also runs in your browser. <a href="/api/proof?cert=${proof.certificate.id}" target="_blank" rel="noopener">Raw data</a>.</p>`;
+  } catch (err) {
+    box.innerHTML = `<p class="fail">Couldn't gather the proof: ${esc(err.message)}. Try again in a minute.</p>`;
+  }
+});
 $("#lookup").addEventListener("submit", (e) => { e.preventDefault(); const v = parseInt($("#cert-id").value, 10); if (v >= 0) lookup(v); });
 $("#verify-btn").addEventListener("click", async () => {
   const text = $("#verify-in").value, out = $("#verify-out");
@@ -544,7 +561,12 @@ $("#mine").addEventListener("click", (e) => { const b = e.target.closest("[data-
     watch(exam);
   }
   const hc = location.hash.match(/cert=(\d+)/);
-  if (hc) { location.hash = "#check"; $("#cert-id").value = hc[1]; lookup(+hc[1]); }
+  if (hc) {
+    const proof = /proof/.test(location.hash);
+    location.hash = "#check"; $("#cert-id").value = hc[1];
+    await lookup(+hc[1]);
+    if (proof) $("#proof-btn")?.click();
+  }
 })();
 
 

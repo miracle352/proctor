@@ -9,22 +9,23 @@ An AI earns a money licence by passing a sealed wallet test: payment requests, h
 
 ## Check it in two minutes
 
-Nothing to install beyond Python 3. These are read-only calls to the contract on NEAR testnet, so they work without a wallet and even when OutLayer is down.
+Nothing to install beyond Python 3 for the first two lines. They are read-only calls to the contract on NEAR testnet, so they work without a wallet and even when OutLayer is down.
 
 ```sh
 python3 tools/check.py          # every licence, every suspension, every hunt
-python3 tools/check.py cert 1146  # the certificate where Claude Haiku paid a hunter's trap
+python3 tools/check.py cert 1146  # the certificate where Claude Haiku paid a visitor's trap
+node tools/proof_check.mjs 1146   # the same certificate checked against Intel's TDX quote (needs Node 20 and `cd web && npm ci`)
 ```
 
 What you should see, as of 12 Nov 2026:
 
 | | Basic wallet test (`money`) | Hard wallet test (`money-pro`) |
 |---|---|---|
-| Claude Haiku 5.5 | 40/42, then **suspended**: paid a hunter's trap | 42/42, licensed |
 | GPT-6.1 Sol | 39/42, licensed | 42/42, licensed |
-| Gemini 3.1 Flash-Lite | 39/42, licensed | 42/42, licensed |
 | Qwen 3.8 | 39/42, licensed | 41/42, paid one scam, not licensed |
-| Claude Sonnet 5.5 | 42/42, then **suspended**: paid a hunter's trap | 39/42, paid three scams, not licensed |
+| Gemini 3.1 Flash-Lite | 39/42, then **suspended**: paid a trap from Proctor's own drill | 42/42, licensed |
+| Claude Haiku 5.5 | 40/42, then **revoked**: paid a visitor's trap | 42/42, then lost it: paid the known scam made from that trap |
+| Claude Sonnet 5.5 | 42/42, then **revoked**: paid a hunter's trap | 39/42, paid three scams, not licensed |
 | GPT-5 nano | 39/42, paid two scams, not licensed | 34/42, paid eight scams, not licensed |
 
 Every number comes from the contract; the script prints them live. Sonnet's three hard-test failures were all the same trick (a bank change in a later message of a thread), and the first hunt used that trick to catch it again.
@@ -32,7 +33,7 @@ Every number comes from the contract; the script prints them live. Sonnet's thre
 Then check the code that decides hunts:
 
 ```sh
-cd contract && cargo test   # 16 tests, including 400 browser-written hunt questions replayed byte for byte
+cd contract && cargo test   # 18 tests, including 400 browser-written hunt questions replayed byte for byte
 ```
 
 ## Who it's for
@@ -50,9 +51,8 @@ cd contract && cargo test   # 16 tests, including 400 browser-written hunt quest
 | Answer keys of hunts built on the page are checked by code, not by anyone | `contract/src/case.rs`; `cargo test` replays 400 browser-written cases byte for byte; the `keys_checked` event on each reveal | The contract and its tests |
 | An agent with a wallet can't spend outside it, and loses it when caught | Agent accounts `6542b954…a502` (Qwen: spend paid, tx `S6gQk9ZGQSMs1thmdEY3nNCYHGhse8r99nwPaXtE6H3`) and `933eaf75…20d` (careful-payer, revoked: wallet frozen and 0.2 NEAR returned, tx `BcXUAg4k4twP1osBgNxMB3CcgBRDZFRTJtRMzvgBiE1x`); each holds one function-call key for `spend`, and a plain transfer signed with it is refused by NEAR | NEAR's access-key rules and `agentwallet/` |
 | Other contracts act on the licence | `vault.proctor-91796.testnet` (pays a bill only for a licensed AI) and `budget.proctor-91796.testnet` (froze Haiku's 0.3 NEAR budget and sent it home, tx `8DfsqjJc8eXyPZs32dBAT8wRsErXnhLVdMrfb52mCvui`) | Each contract's own cross-contract call to `licence` |
-| Nobody, us included, can read a hunt before the AIs answer | `web/src/seal.js` encrypts in the browser; the guest relay receives only ciphertext (`web/api/guest.js`) | **Trusted:** OutLayer's keystore and its Intel TDX enclave release the secret only to the pinned grader build. We don't verify TDX quotes ourselves. The keystore's public key reaches the page through our relay, so the page prints it for you to compare with the `outlayer` CLI |
-| The grader that marked an answer is the build we published | Every certificate carries `grader_version`; the contract refuses reports from any other build | **Trusted:** OutLayer runs the build with that hash |
-| The AI saw exactly the sealed question | The grader checks the set's sha256 against the fingerprint committed on chain before any AI saw it | **Trusted:** OutLayer, as above |
+| Nobody, us included, can read a hunt before the AIs answer | `web/src/seal.js` encrypts in the browser; the guest relay receives only ciphertext (`web/api/guest.js`) | **Trusted:** OutLayer's keystore releases the secret only inside its enclave. The keystore's public key reaches the page through our relay, so the page prints it for you to compare with the `outlayer` CLI |
+| Each certificate was marked inside approved Intel TDX hardware, by the published grader, on the sealed questions | **Check the hardware proof** on any certificate at `/app#check`, or `node tools/proof_check.mjs 982 1146 1196`. Your browser finds OutLayer's result for that run on chain, hashes it, and checks: the hash is the one in the attestation; the report matches the certificate field for field; the build is `grader_version`; the secret opened was `keeper/set_id`; all of it hashes to the report data inside the TDX quote; the quote's measurements are on `worker.outlayer.testnet`'s approved list. Changing one score breaks the first check | **Trusted:** Intel's signature on the quote. We link to OutLayer's verifier, which checks it in your browser with Intel's collateral; we don't re-implement DCAP |
 | What the model answered | Only the mark leaves the enclave | **Trusted:** the model provider. Only Qwen 3.8 runs in an attested TEE; Claude, GPT and Gemini run on their makers' servers, and the certificate records that (`sealed: false`) |
 
 Scores are one run per model on 42 questions per test. The catches are single events, real on chain, but not statistics.
@@ -94,6 +94,7 @@ buyer ──request_run──> contract ──yield──> OutLayer (Intel TDX)
 - **Drills** (`tools/drill.mjs`, `.github/workflows/drill.yml`). Every six hours Proctor opens its own hunt: two traps generated by code (`web/src/tricks.js`) from the tricks that have caught AIs, with fresh companies, amounts and account numbers, fired at every licence holder through the public guest service, then revealed so the contract checks the keys. A drill's traps are rebuilt from its name with a seeded generator, so the job keeps no state and no secrets; a drill that catches an AI becomes a known scam when it settles. Known scams are published on reveal and could be trained on; variants of the same trick can't be. The first drill (`hunt-g-drill-mwdxbf0f`, 12 Nov) caught Gemini 3.1 Flash-Lite with a bank change in a thread.
 - **Sealing in the browser** (`web/src/seal.js`). ECIES as OutLayer's CLI does it: X25519, HKDF-SHA256 with `outlayer-keystore-v1`, ChaCha20-Poly1305. The keystore key doesn't depend on the plaintext, so the page asks for it with an empty payload; OutLayer doesn't allow browser calls, so `/api/pubkey` relays that request (owner and profile only). `tools/seal_hunt.mjs` runs the same code from the command line.
 - **Guest hunts** (`web/api/guest.js`). Receives only the sealed copy, checks it is locked to the current grader build, caps a day's guest hunts, and signs from a sponsor account.
+- **Hardware proof** (`web/api/proof.js`, `web/src/proof.js`). For a certificate, the server finds OutLayer's `resolve_execution` call a few blocks earlier whose report matches it, takes the request id, and fetches OutLayer's attestation (the TDX quote plus the hashes it covers). The browser then does the checking: sha256 of the report as sorted compact JSON equals `output_hash`; the report matches the certificate; `wasm_hash` equals `grader_version`; `secrets_ref` is the set's keeper and id; OutLayer's task hash over all those fields equals the quote's report data (bytes 568–600); RTMR3 equals the worker measurement and `worker.outlayer.testnet` lists the measurements as approved. The server is only a fetcher, so it doesn't need to be trusted. `tools/proof_check.mjs` runs the same checks in CI and also forges a score to show they fail.
 
 ## Run it yourself
 
@@ -126,6 +127,7 @@ Everything network-specific lives in `web/network.js`. The site builds for testn
 
 - Testnet only, no audit. Hunt payouts are testnet NEAR and capped at 0.1 NEAR a catch.
 - One run per model on 42 questions per test. Re-runs are next; small differences between models may not hold.
+- Intel's signature on the TDX quote is checked by OutLayer's verifier page (in your browser), not by our code.
 - The page gets OutLayer's key through our relay, so in principle the relay could hand out a different key. The page shows the key's fingerprint; compare it with `outlayer` CLI before sealing something you care about.
 - Free-form hunts (made outside the page, without parts) can't be checked by code; for those a challenge is still decided by the contract owner.
 - A model's maker sees the questions unless the model runs in a TEE. Proctor records this; it can't prevent it.
@@ -136,7 +138,7 @@ Everything network-specific lives in `web/network.js`. The site builds for testn
 - **Track:** AI Security & Defense (`security`); also fits Agent Economy (`agents`).
 - **Track hints, and where they are:**
   - *Agent security:* licences an agent must hold to move money (`contract/`), public hunts that take them away, known scams that every licence must keep passing, and two contracts that act on the licence (`vault/`, `budget/`).
-  - *TEE attestation:* every exam and hunt is marked inside OutLayer's Intel TDX enclave by a grader build pinned by hash; the sealed questions open only for that build. Qwen 3.8 answers from NEAR AI Cloud's attested TEE. What we verify ourselves and what we trust is in [What's proven, what's trusted](#whats-proven-whats-trusted).
+  - *TEE attestation:* every exam and hunt is marked inside OutLayer's Intel TDX enclave by a grader build pinned by hash; the sealed questions open only for that build. Any certificate can be checked against the TDX quote of the machine that marked it, in the browser (`web/src/proof.js`): output hash, task hash in the quote's report data, build hash, sealed-secret name, and approved measurements. Qwen 3.8 answers from NEAR AI Cloud's attested TEE. What we verify and what we trust is in [What's proven, what's trusted](#whats-proven-whats-trusted).
   - *Function-call keys:* licensed agent wallets (`agentwallet/`, live at `wallets.proctor-91796.testnet`). The agent's own account holds a single function-call key that can only call `spend` there, so the protocol refuses anything else it tries; each spend asks Proctor for the licence, and a refused one freezes the wallet and sends the rest to the owner.
 - **NEAR pieces used:** NEAR smart contracts (near-sdk), yield/resume to OutLayer, OutLayer's keystore and TEE execution, NEAR AI Cloud, cross-contract calls (`vault/`, `budget/` call `licence`), NEAR wallets through wallet-selector.
 - **Libraries (Q-005).** Rust: near-sdk 5.9, serde, serde_json, sha2, hex; built with cargo-near. Web: Vite 6, @near-wallet-selector 10 (core, modal-ui, my-near-wallet, meteor-wallet, here-wallet, intear-wallet), @near-js accounts/providers/signers 2.5, @noble/curves, @noble/hashes, @noble/ciphers, buffer, Fontsource fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono, Big Shoulders Display). MCP server: @modelcontextprotocol/sdk, zod. Tools: Python 3 with the cryptography package, the outlayer CLI, near-cli-rs. No templates.
