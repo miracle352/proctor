@@ -352,7 +352,7 @@ function huntCard(h, mine) {
   if (mine && guest && !h.settled) {
     const runs = D.runs?.[h.set_id] ?? 0, young = Date.now() - h.opened_ms < 4 * 60_000;
     if (!h.revealed_ms && runs === 0) actions += `<button class="btn primary" type="button" data-guest-fire="${esc(h.set_id)}"><span class="dot"></span>Fire it at the licence holders</button><span class="hint">It hasn't been put to any AI yet.</span>`;
-    else if (!h.revealed_ms && young) actions += `<span class="hint">The AIs are still answering. Reveal once they're done.</span>`;
+    else if (!h.revealed_ms && young) actions += `<span class="hint">The AIs are still answering. Keep this page open and it reveals the hunt for you once they're done.</span>`;
     else if (!h.revealed_ms && Date.now() < h.reveal_by_ms) actions += `<button class="btn ghost" type="button" data-guest-reveal="${esc(h.set_id)}">Reveal it to make catches final</button><span class="hint">Revealing ends the hunt. No AI can be fired at after this.</span>`;
     if (kind === "ready") actions += `<button class="btn primary" type="button" data-guest-settle="${esc(h.set_id)}"><span class="dot"></span>Settle</button>`;
   } else if (mine && !h.settled) {
@@ -394,7 +394,33 @@ async function refresh() {
     return;
   }
   renderTally(); renderBoard(); renderHunts();
+  autoReveal();
 }
+
+// A guest hunt's catches only count once it's revealed, and testers tend to
+// leave before doing it. So when every AI it was fired at has answered (or
+// twenty minutes have passed), this browser, which holds the questions,
+// reveals it. A wallet hunt is left to its owner: it needs their signature.
+const tried = new Set();
+async function autoReveal() {
+  if (!D) return;
+  const g = guestIds();
+  for (const h of D.hunts) {
+    if (!g.includes(h.set_id) || h.revealed_ms || h.settled || Date.now() >= h.reveal_by_ms || tried.has(h.set_id)) continue;
+    const text = store.get(KEEP(h.set_id)), runs = D.runs?.[h.set_id] ?? 0;
+    if (!text || !runs) continue;
+    const answered = Object.keys(D.answers?.[h.set_id] || {}).length;
+    const age = Date.now() - h.opened_ms;
+    if (!(answered >= runs && age > 3 * 60_000) && age < 20 * 60_000) continue;
+    tried.add(h.set_id);
+    try {
+      await guestApi({ action: "reveal", set_id: h.set_id, plaintext: text });
+      toast(h.catches.length ? `${h.set_id} revealed, so its catches count. Anyone can check your answer keys now.` : `${h.set_id} revealed. Every AI refused it.`);
+      setTimeout(refresh, 3000);
+    } catch (e) { console.warn("auto reveal", h.set_id, e); }
+  }
+}
+setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 30_000);
 
 /* firing, revealing, settling */
 document.addEventListener("click", async (e) => {
