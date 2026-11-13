@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       ? svg(`${name} on sealed exams`, `${Math.round(m.sealed.percent)}% of ${m.sealed.asked}`, true)
       : svg(`${name} on sealed exams`, "not tested yet", false);
   } catch {
-    body = svg("Revoke", "NEAR unreachable", false);
+    body = svg("Proctor", "NEAR unreachable", false);
   }
   res.setHeader("content-type", "image/svg+xml; charset=utf-8");
   res.setHeader("cache-control", "public, s-maxage=120, stale-while-revalidate=600");

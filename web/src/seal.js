@@ -1,6 +1,6 @@
 // Sealing in the browser. A hunt's questions are encrypted here, on the
 // hunter's own machine, to OutLayer's keystore, so the only thing that can
-// read them is the grader build running inside secure hardware. Revoke's
+// read them is the grader build running inside secure hardware. Proctor's
 // servers never see them. Same scheme as the outlayer CLI (ECIES v1):
 // X25519 key agreement, HKDF-SHA256 with info "outlayer-keystore-v1",
 // ChaCha20-Poly1305, sent as [0x01 | ephemeral key | nonce | ciphertext].

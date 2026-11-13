@@ -1,4 +1,4 @@
-"""Read Revoke's state from NEAR testnet with only Python's standard library.
+"""Read Proctor's state from NEAR testnet with only Python's standard library.
 
 No wallet, no keys, no OutLayer: these are free view calls to the contract,
 so they work even when OutLayer's testnet is down.
@@ -26,7 +26,7 @@ def view(method, args=None):
     last = None
     for url in NODES:
         try:
-            req = urllib.request.Request(url, body, {"content-type": "application/json", "user-agent": "revoke-check"})
+            req = urllib.request.Request(url, body, {"content-type": "application/json", "user-agent": "proctor-check"})
             r = json.load(urllib.request.urlopen(req, timeout=20))["result"]
             if "error" in r:
                 raise RuntimeError(r["error"])

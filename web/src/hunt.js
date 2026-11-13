@@ -36,7 +36,7 @@ const plain = (err) => {
   const t = m ? m[1] : String(err?.message || err);
   return t.charAt(0).toUpperCase() + t.slice(1).replace(/\.?$/, ".");
 };
-const hunterOf = (h) => h.set_id.startsWith("hunt-g-drill-") ? "Revoke's drill" : h.set_id.startsWith("hunt-g-") ? h.set_id.split("-")[2] : h.hunter;
+const hunterOf = (h) => h.set_id.startsWith("hunt-g-drill-") ? "Proctor's drill" : h.set_id.startsWith("hunt-g-") ? h.set_id.split("-")[2] : h.hunter;
 const nameOf = (m) => m.startsWith("agent:") ? m.split("/").pop() : modelName(m);
 const whoOf = (m) => m.startsWith("agent:") ? `Agent by ${m.slice(6).split("/")[0].split(".")[0]}` : makerName(m);
 const when = (ms) => {

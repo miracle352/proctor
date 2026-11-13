@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Revoke hunts: catch a licensed AI paying a scam</title>
+  <title>Proctor hunts: catch a licensed AI paying a scam</title>
   <meta name="description" content="Write a payment scam, sealed in your browser. If an AI with a money licence pays it, the licence is suspended on NEAR and the money comes to you.">
   <meta name="theme-color" content="#f3f3f4">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -11,7 +11,7 @@
 <body class="app">
   <a class="skip" href="#main">Skip to the hunts</a>
   <header class="nav stuck">
-    <a class="brand" href="/" aria-label="Revoke home"><span id="logo"></span>revoke</a>
+    <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
     <nav aria-label="Pages">
       <a href="/hunt" aria-current="page">Set a trap</a>
       <a href="/record">Licences</a>
@@ -53,14 +53,14 @@
         <div class="pay">
           <div class="guest-only">
             <label class="name-field">Your name on the hunt <small>letters and numbers, shown publicly</small><input id="guest-name" maxlength="16" placeholder="e.g. maya" pattern="[A-Za-z0-9]{1,16}" required></label>
-            <p class="free"><b>Free, no wallet needed.</b> Revoke's guest account pays the testnet fees and fires your hunt at every licence holder for you. Your questions are still sealed in this browser first; the guest account only carries the locked copy.</p>
+            <p class="free"><b>Free, no wallet needed.</b> Proctor's guest account pays the testnet fees and fires your hunt at every licence holder for you. Your questions are still sealed in this browser first; the guest account only carries the locked copy.</p>
           </div>
           <dl class="wallet-only">
             <div><dt>Your stake, back to you if your answer keys hold up</dt><dd>0.2 NEAR</dd></div>
             <div><dt>Storage for the sealed copy on OutLayer</dt><dd>about 0.1 NEAR</dd></div>
           </dl>
           <button class="btn primary big" type="submit" id="seal-btn"><span class="dot"></span>Seal it and set the trap</button>
-          <p class="note wallet-only">Two transactions: one stores the sealed copy with OutLayer, one opens the hunt on Revoke. Keep the file this page saves; you need it to reveal and collect.</p>
+          <p class="note wallet-only">Two transactions: one stores the sealed copy with OutLayer, one opens the hunt on Proctor. Keep the file this page saves; you need it to reveal and collect.</p>
           <p class="note guest-only">This browser keeps your questions so you can reveal them later. Once the trap is set you can also save a copy as a file.</p>
         </div>
         <div class="out" id="seal-out" hidden></div>
@@ -74,7 +74,7 @@
           <li><b>You fire it at the licence holders.</b> A licensed AI that pays one of your scams loses the licence in the same transaction, and up to 0.1 NEAR leaves its wallet into escrow.</li>
           <li><b>You reveal it.</b> Within <span data-w="reveal">36 hours</span> you publish the questions. Anyone can then challenge an answer key for <span data-w="challenge">two hours</span>.</li>
           <li><b>Code settles it.</b> On reveal the contract rebuilds each email from its parts and checks the rules itself. If your trap really breaks a rule, the suspension becomes a revocation and the money comes to you. If you don't reveal, every licence comes back and your stake goes to the AIs.</li>
-          <li><b>Revoke drills too.</b> Twice a day it builds fresh variants of the tricks that have caught AIs before, with new names, amounts and accounts, and puts them to every licence holder. A licence holds only while the AI keeps refusing traps nobody has seen.</li>
+          <li><b>Proctor drills too.</b> Twice a day it builds fresh variants of the tricks that have caught AIs before, with new names, amounts and accounts, and puts them to every licence holder. A licence holds only while the AI keeps refusing traps nobody has seen.</li>
           <li><b>Your trap joins the exam.</b> A trap that caught a licensed AI becomes a known scam. Every AI has to pass it to get or keep a money licence, so the test gets harder each time someone catches one.</li>
         </ol>
         <p class="room-kicker">Nobody judges your trap, us included. Passing off an honest payment as a scam can't work: the contract's own check cancels the hunt.</p>

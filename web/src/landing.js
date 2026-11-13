@@ -20,7 +20,7 @@ const nav = $("#nav"), hall = $(".hall"), win = $("#window");
 let sy = scrollY;
 addEventListener("scroll", () => (sy = scrollY), { passive: true });
 
-/* the exam-hall lamp: follows the pointer over the hall, wanders when left alone */
+/* the proctor's lamp: follows the pointer over the hall, wanders when left alone */
 const lamp = { x: 0.68, y: 0.42, tx: 0.68, ty: 0.42, last: 0 };
 addEventListener("pointermove", (e) => {
   if (e.clientY > innerHeight * 1.1) return;

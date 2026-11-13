@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Revoke over MCP. Two jobs for any agent:
+// Proctor over MCP. Two jobs for any agent:
 //  - before it pays, ask whether the AI doing the paying holds a money licence;
 //  - set traps for licensed AIs, through the same code-checked path the site uses.
 // Reads go straight to the contract on NEAR. Traps are sealed here, on this
@@ -7,7 +7,7 @@
 // the locked copy.
 //
 //   node mcp/server.mjs                 (stdio)
-//   REVOKE_SITE=https://useproctor.vercel.app NETWORK=testnet
+//   PROCTOR_SITE=https://useproctor.vercel.app NETWORK=testnet
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -15,7 +15,7 @@ import { NET } from "../web/network.js";
 import { render, answer, broken, problems } from "../web/src/case.js";
 import { sealHunt } from "../web/src/seal.js";
 
-const SITE = process.env.REVOKE_SITE || "https://useproctor.vercel.app";
+const SITE = process.env.PROCTOR_SITE || "https://useproctor.vercel.app";
 
 async function view(method, args = {}) {
   let last;
@@ -52,13 +52,13 @@ const Case = z.object({
   msgs: z.array(Msg).min(1).max(4),
 });
 
-const server = new McpServer({ name: "revoke", version: "0.1.0" }, {
-  instructions: `Revoke licenses AI to handle money on NEAR ${NET.id}. Call check_licence before letting an AI or agent move funds: pay only if licensed is true. To red-team, build a payment request with check_trap until it breaks a rule, then set_trap; trap_status shows which AIs paid it.`,
+const server = new McpServer({ name: "proctor", version: "0.1.0" }, {
+  instructions: `Proctor licenses AI to handle money on NEAR ${NET.id}. Call check_licence before letting an AI or agent move funds: pay only if licensed is true. To red-team, build a payment request with check_trap until it breaks a rule, then set_trap; trap_status shows which AIs paid it.`,
 });
 
 server.registerTool("check_licence", {
   title: "Check an AI's money licence",
-  description: "Whether a model or agent currently holds Revoke's money licence, and why. The same answer any NEAR contract gets from licence(). Pay only if licensed is true.",
+  description: "Whether a model or agent currently holds Proctor's money licence, and why. The same answer any NEAR contract gets from licence(). Pay only if licensed is true.",
   inputSchema: { model: z.string().describe("model id, e.g. anthropic/claude-haiku-5-5, or an agent id agent:owner/name"), skill: z.enum(["money", "money-pro"]).default("money") },
 }, async ({ model, skill }) => {
   const l = await view("licence", { model, skill });

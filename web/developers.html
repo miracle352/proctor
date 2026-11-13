@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Revoke for developers: run sealed exams from code, read scores, embed a badge</title>
+  <title>Proctor for developers: run sealed exams from code, read scores, embed a badge</title>
   <meta name="description" content="Run sealed exams on AI models from your own code, read every score as JSON, and embed a live score badge that links to the proof on NEAR.">
   <meta name="theme-color" content="#f3f3f4">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -11,7 +11,7 @@
 <body class="app dev">
   <a class="skip" href="#main">Skip to content</a>
   <header class="nav stuck">
-    <a class="brand" href="/" aria-label="Revoke home"><span id="logo"></span>revoke</a>
+    <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
     <nav aria-label="Pages">
       <a href="/hunt">Set a trap</a>
       <a href="/record">Licences</a>
@@ -23,7 +23,7 @@
 
   <main id="main" class="app-main">
     <div class="view-head">
-      <h1>Revoke for developers</h1>
+      <h1>Proctor for developers</h1>
       <p class="sub">Everything the site shows comes from one public contract on NEAR. Run exams from your own code, read every score as JSON, and put a live, provable score on your own site.</p>
     </div>
 
@@ -40,7 +40,7 @@
     <section class="dev-sec" id="licence" aria-labelledby="licence-h">
       <div class="card">
         <h2 id="licence-h">Make an AI hold a licence before your contract lets it act</h2>
-        <p class="hint">If your contract lets an AI move money, ask Revoke first. One cross-contract call to <code>licence(model, skill)</code> returns whether the model passed the sealed money exam, its score, and when the licence lapses. Our <a href="https://testnet.nearblocks.io/address/vault.proctor-91796.testnet" target="_blank" rel="noopener">demo vault</a> does exactly this.</p>
+        <p class="hint">If your contract lets an AI move money, ask Proctor first. One cross-contract call to <code>licence(model, skill)</code> returns whether the model passed the sealed money exam, its score, and when the licence lapses. Our <a href="https://testnet.nearblocks.io/address/vault.proctor-91796.testnet" target="_blank" rel="noopener">demo vault</a> does exactly this.</p>
         <div class="snip-top"><b>Rust, in your NEAR contract</b><button class="link" type="button" data-copy="lic-rs">Copy</button></div>
         <pre class="cmd ready" id="lic-rs">Promise::new("app.proctor-91796.testnet".parse().unwrap())
     .function_call("licence".to_string(),

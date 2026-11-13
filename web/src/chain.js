@@ -52,7 +52,7 @@ export async function balance(account) {
   return BigInt(r.amount);
 }
 
-// Logs of a transaction so far. Revoke writes "EVENT proctor certificate ID ..."
+// Logs of a transaction so far. Proctor writes "EVENT proctor certificate ID ..."
 // or "EVENT proctor run_failed SET WHY" once the grader has answered.
 export async function txEvents(hash, sender) {
   try {

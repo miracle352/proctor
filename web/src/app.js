@@ -103,7 +103,7 @@ function renderExposure() {
   note.hidden = false;
   note.innerHTML = s.exposed_to.includes(p)
     ? `${esc(makerName(pick.model))} has already seen this set, so this score tells you less than one on a set it hasn't seen.`
-    : `Running ${esc(modelName(pick.model))} on this set will mark it as seen by ${esc(makerName(pick.model))}, for good. That's how Revoke keeps scores honest.`;
+    : `Running ${esc(modelName(pick.model))} on this set will mark it as seen by ${esc(makerName(pick.model))}, for good. That's how Proctor keeps scores honest.`;
 }
 let allowance = null;
 async function refreshAllowance() {
@@ -119,7 +119,7 @@ function renderLength() {
   if (pick.len > s.size) pick.len = s.size;
   $("#length").innerHTML = opts.map(([n, t, d]) =>
     `<label class="seg-opt ${n > left ? "off" : ""}"><input type="radio" name="len" value="${n}" ${pick.len === n ? "checked" : ""} ${n > left ? "disabled" : ""}><b>${t}</b><small>${d}</small></label>`).join("");
-  $("#allowance").textContent = !me ? "Each account can ask up to 20 questions a day while Revoke runs on test money."
+  $("#allowance").textContent = !me ? "Each account can ask up to 20 questions a day while Proctor runs on test money."
     : allowance?.unlimited ? "This account has no daily limit."
     : allowance ? `You can ask ${allowance.account_left} more question${allowance.account_left === 1 ? "" : "s"} today.` : "";
   renderCost();
@@ -364,7 +364,7 @@ async function renderMyAgents() {
 $("#my-agents").addEventListener("click", async (e) => {
   const rm = e.target.closest("[data-remove]");
   if (rm) {
-    if (!confirm("Remove this agent? Its instructions stay in NEAR's transaction history, but it disappears from Revoke and can't sit exams.")) return;
+    if (!confirm("Remove this agent? Its instructions stay in NEAR's transaction history, but it disappears from Proctor and can't sit exams.")) return;
     try { await send([["remove_agent", { agent_id: rm.dataset.remove }, 0n, "30000000000000"]], `${location.origin}${location.pathname}#agent`); toast("Agent removed"); }
     catch (err) { toast(plain(err), true); }
     await renderMyAgents();

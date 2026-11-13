@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       const paid = kind === "hunt" ? c.asked - c.correct - c.failures : undefined;
       return {
         cert: c.id, set: c.set_id, kind, asked: c.asked, right: c.correct, failed: c.failures, block: c.block_height, sealed: c.sealed,
-        ...(h ? { hunter: h.set_id.startsWith("hunt-g-drill-") ? "Revoke's drill" : h.set_id.startsWith("hunt-g-") ? h.set_id.split("-")[2] : h.hunter, paid, caught: h.catches.some((x) => x.cert_id === c.id) } : {}),
+        ...(h ? { hunter: h.set_id.startsWith("hunt-g-drill-") ? "Proctor's drill" : h.set_id.startsWith("hunt-g-") ? h.set_id.split("-")[2] : h.hunter, paid, caught: h.catches.some((x) => x.cert_id === c.id) } : {}),
       };
     }).sort((a, b) => b.block - a.block);
     // one line per exam part: certificates of one set merge, newest first

@@ -25,8 +25,8 @@ function renderBadge() {
   const m = $("#b-model").value;
   const img = `${SITE}/api/badge?model=${encodeURIComponent(m)}`, link = `${SITE}/#scores`;
   $("#b-preview").innerHTML = `<img src="/api/badge?model=${encodeURIComponent(m)}" alt="${esc(modelName(m))} score on sealed exams" height="30">`;
-  $("#b-md").textContent = `[![${modelName(m)} on Revoke sealed exams](${img})](${link})`;
-  $("#b-html").textContent = `<a href="${link}"><img src="${img}" alt="${modelName(m)} on Revoke sealed exams" height="30"></a>`;
+  $("#b-md").textContent = `[![${modelName(m)} on Proctor sealed exams](${img})](${link})`;
+  $("#b-html").textContent = `<a href="${link}"><img src="${img}" alt="${modelName(m)} on Proctor sealed exams" height="30"></a>`;
 }
 $("#b-model").addEventListener("change", renderBadge);
 

@@ -8,7 +8,7 @@ $("#logo").innerHTML = LOGO;
 const id = new URLSearchParams(location.search).get("model");
 const nameOf = (m) => m.startsWith("agent:") ? m.split("/").pop() : modelName(m);
 const whoOf = (m) => m.startsWith("agent:") ? `Agent by ${m.slice(6).split("/")[0]}` : makerName(m);
-const whose = (e) => e.hunter === "Revoke's drill" ? "a trap in Revoke's drill" : `${esc(e.hunter)}'s trap`;
+const whose = (e) => e.hunter === "Proctor's drill" ? "a trap in Proctor's drill" : `${esc(e.hunter)}'s trap`;
 const link = (m) => `/record?model=${encodeURIComponent(m)}`;
 
 async function record(m) {
@@ -37,7 +37,7 @@ async function list() {
 /* one record */
 async function show(m) {
   $("#rec").hidden = false;
-  document.title = `${nameOf(m)}: licence record · Revoke`;
+  document.title = `${nameOf(m)}: licence record · Proctor`;
   $("#r-name").textContent = nameOf(m);
   $("#r-kind").textContent = m.startsWith("agent:") ? "Agent licence record" : "AI licence record";
   let r;
@@ -83,7 +83,7 @@ async function show(m) {
   $("#r-events").innerHTML = ev.join("") || `<li class="hint">Nothing yet.</li>`;
 
   const code = {
-    rust: `// Ask Revoke before your contract lets ${nameOf(m)} move money.
+    rust: `// Ask Proctor before your contract lets ${nameOf(m)} move money.
 Promise::new("${CONTRACT}".parse().unwrap())
     .function_call("licence".into(),
         json!({ "model": "${m}", "skill": "money" }).to_string().into_bytes(),
@@ -98,7 +98,7 @@ if (!licensed) throw new Error(\`Not paying: \${reason}\`);`,
     $$("#use-tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === t)));
     $("#use-code").hidden = t === "badge"; $("#use-badge").hidden = t !== "badge";
     if (t !== "badge") $("#use-code").textContent = code[t];
-    else $("#use-badge").innerHTML = `<img src="${badge}" alt="Revoke licence badge for ${esc(nameOf(m))}"><pre class="cmd">${esc(`![Revoke licence](${badge})`)}</pre>`;
+    else $("#use-badge").innerHTML = `<img src="${badge}" alt="Proctor licence badge for ${esc(nameOf(m))}"><pre class="cmd">${esc(`![Proctor licence](${badge})`)}</pre>`;
   };
   $("#use-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-t]"); if (b) tab(b.dataset.t); });
   tab("rust");

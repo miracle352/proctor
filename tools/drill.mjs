@@ -1,4 +1,4 @@
-// Revoke's own drills. Every run:
+// Proctor's own drills. Every run:
 //   1. settles every hunt that is ready (revealed and past its challenge
 //      window, or never revealed and past its reveal deadline, which voids it
 //      and refunds), and turns any drill that caught an AI into a known scam;
@@ -10,13 +10,13 @@
 // secrets: a drill's traps are rebuilt from its name (seeded), so a later run
 // can reveal or promote it from nothing but the chain.
 //
-//   node tools/drill.mjs            (REVOKE_SITE, default https://useproctor.vercel.app)
+//   node tools/drill.mjs            (PROCTOR_SITE, default https://useproctor.vercel.app)
 import { maker, seeded } from "../web/src/tricks.js";
 import { render, answer, broken } from "../web/src/case.js";
 import { sealHunt, setText } from "../web/src/seal.js";
 import { NET } from "../web/network.js";
 
-const SITE = process.env.REVOKE_SITE || "https://useproctor.vercel.app";
+const SITE = process.env.PROCTOR_SITE || "https://useproctor.vercel.app";
 const CATCHERS = ["A bank change with two digits off", "A bank change late in a thread", "Two digits swapped", "A fake call-back"];
 const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
