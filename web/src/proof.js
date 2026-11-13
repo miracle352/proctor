@@ -1,11 +1,17 @@
 // Checks a certificate against the Intel TDX quote of the machine that marked it.
 // Everything is recomputed here, in the visitor's browser, from public data:
-// /api/proof only fetches. The one thing left to Intel's own verifier is the
-// quote's signature chain, which OutLayer's page checks in the browser too.
+// /api/proof only fetches. Intel's signature on the quote is checked here too,
+// with Phala's open-source DCAP verifier: the chain must end at Intel's root
+// certificate, which is built into the verifier, so the collateral server that
+// supplies Intel's signed TCB data doesn't have to be trusted.
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
 import { NET } from "../network.js";
 import { view } from "./chain.js";
+
+// Intel's signed collateral (TCB info, QE identity, CRLs), relayed by Phala's
+// public PCCS. It is signed by Intel, so the relay only has to be online.
+const PCCS = "https://pccs.phala.network";
 
 // JSON with keys sorted and no spaces: the form OutLayer hashes the output in
 const canon = (v) => Array.isArray(v) ? `[${v.map(canon).join(",")}]`
@@ -65,6 +71,23 @@ export async function check(p) {
   const th = taskHash(a);
   add(th === q.reportData, "The quote is bound to this run",
     `All of the above hashes to ${th.slice(0, 16)}…, which sits inside Intel's signed quote.`);
+
+  // Intel's signature: quote -> PCK certificate -> Intel's root, plus Intel's
+  // signed TCB info and QE identity, and the CRLs. Debug enclaves are refused.
+  let intel = null, why = "";
+  try {
+    const dq = (await import("@phala/dcap-qvl")).default ?? (await import("@phala/dcap-qvl"));
+    const col = await dq.getCollateral(PCCS, quote);
+    const r = dq.verify(quote, col, Math.floor(Date.now() / 1000));
+    const td = r.report?.data || {}, hx = (v) => typeof v === "string" ? v : bytesToHex(Uint8Array.from(v || []));
+    intel = { status: r.status, advisories: r.advisory_ids || [], reportData: hx(td.reportData).slice(0, 64), mrtd: hx(td.mrTd), rtmr3: hx(td.rtMr3) };
+  } catch (e) { why = e?.message || String(e); }
+  const signed = !!intel && ["UpToDate", "SWHardeningNeeded", "ConfigurationNeeded", "ConfigurationAndSWHardeningNeeded"].includes(intel.status)
+    && intel.reportData === q.reportData && intel.mrtd === q.mrtd && intel.rtmr3 === q.rtmr[3];
+  add(signed, "A genuine Intel TDX chip signed the quote",
+    intel ? `The signature chain ends at Intel's root certificate, checked in this browser. TCB status: ${intel.status}${intel.advisories.length ? ` (advisories ${intel.advisories.join(", ")})` : ""}. Not a debug enclave.`
+      : `Intel's signature didn't check out: ${why.slice(0, 160)}`);
+  p.intel = intel;
 
   let approved = false;
   try {

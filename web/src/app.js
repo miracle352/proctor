@@ -507,7 +507,7 @@ $("#cert-out").addEventListener("click", async (e) => {
     const all = rows.every((r) => r.ok);
     box.innerHTML = `<h4>${all ? "The hardware proof holds" : "The hardware proof doesn't hold"}</h4>
       <ol class="proof-rows">${rows.map((r, i) => `<li class="${r.ok ? "ok" : "bad"}" style="--i:${i}"><b>${esc(r.title)}</b><span>${esc(r.detail)}</span></li>`).join("")}</ol>
-      <p class="note">One step is left to Intel: that the quote is signed by a genuine TDX chip. <a href="${proof.outlayer_verifier}" target="_blank" rel="noopener">Check the signature on OutLayer's verifier</a>, which also runs in your browser. <a href="/api/proof?cert=${proof.certificate.id}" target="_blank" rel="noopener">Raw data</a>.</p>`;
+      <p class="note">Every check ran in this browser, Intel's signature included (Phala's open-source DCAP verifier, against Intel's root certificate). A second opinion: <a href="${proof.outlayer_verifier}" target="_blank" rel="noopener">OutLayer's verifier</a>. <a href="/api/proof?cert=${proof.certificate.id}" target="_blank" rel="noopener">Raw data</a>.</p>`;
   } catch (err) {
     box.innerHTML = `<p class="fail">Couldn't gather the proof: ${esc(err.message)}. Try again in a minute.</p>`;
   }
