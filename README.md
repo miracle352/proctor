@@ -60,7 +60,7 @@ Every number comes from the contract; the script prints them live. Sonnet's thre
 Then check the code that decides hunts:
 
 ```sh
-cd contract && cargo test   # 33 tests, most named after an attack in THREAT_MODEL.md, plus 400 browser-written hunt questions replayed byte for byte
+cd contract && cargo test   # 38 tests, most named after an attack in THREAT_MODEL.md, plus 400 browser-written hunt questions replayed byte for byte
 ```
 
 ## Who it's for
@@ -82,7 +82,7 @@ cd contract && cargo test   # 33 tests, most named after an attack in THREAT_MOD
 | Each certificate was marked inside a genuine, approved Intel TDX machine, by the published grader, on the sealed questions | **Check the hardware proof** on any certificate at `/app#check`, or `node tools/proof_check.mjs 982 1146 1196`. Your browser finds OutLayer's result for that run on chain, hashes it, and checks: the hash is the one in the attestation; the report matches the certificate field for field; the build is `grader_version`; the secret opened was `keeper/set_id`; all of it hashes to the report data inside the TDX quote; Intel's signature on the quote chains to Intel's root certificate (Phala's DCAP verifier, `@phala/dcap-qvl`, run in the browser; debug enclaves refused; TCB status shown); the quote's measurements are on `worker.outlayer.testnet`'s approved list. Changing one score breaks the first check; changing one byte of the quote breaks Intel's | Intel's root certificate (built into the verifier) and Intel's signed TCB data. The collateral comes through Phala's public PCCS, but it is signed by Intel, so the relay can't fake it |
 | What the model answered | Only the mark leaves the enclave | **Trusted:** the model provider. Only Qwen 3.8 runs in an attested TEE; Claude, GPT and Gemini run on their makers' servers, and the certificate records that (`sealed: false`) |
 
-[`THREAT_MODEL.md`](THREAT_MODEL.md) goes through 23 ways an AI, an agent's owner, a hunter or we ourselves could cheat, each with what stops it and the test or transaction that shows it, and lists what isn't stopped.
+[`THREAT_MODEL.md`](THREAT_MODEL.md) goes through 24 ways an AI, an agent's owner, a hunter or we ourselves could cheat, each with what stops it and the test or transaction that shows it, and lists what isn't stopped.
 
 **Builds you can check.** Every contract is built with `cargo near build reproducible-wasm` in a pinned Docker image (`[package.metadata.near.reproducible_build]` in each `Cargo.toml`), so it carries a NEP-330 record of the commit it came from. The CI job `deployed-code-matches-repo` reads that record from each account, checks out the commit, rebuilds, and fails unless the hash equals the code on chain. By hand: `node tools/verify_build.mjs app.proctor-91796.testnet` prints the commit; build it and pass the wasm as a second argument.
 
@@ -114,7 +114,7 @@ buyer ──request_run──> contract ──yield──> OutLayer (Intel TDX)
                          marks the set as seen if the model ran outside a TEE
 ```
 
-- **NEAR contract** (`contract/`, near-sdk 5). Sets are committed by fingerprint with a stake. `request_run` takes the writers' fee and the model fee, then calls OutLayer pinned to one grader build using yield/resume. `on_report` checks the report against the committed fingerprint and the pinned build before storing a certificate. After a set retires it is revealed and anyone can `challenge` an answer with a bond.
+- **NEAR contract** (`contract/`, near-sdk 5). Sets are committed by fingerprint with a stake. `request_run` takes the writers' fee and the model fee, then calls OutLayer pinned to one grader build using yield/resume. A new grader build is only proposed (`propose_grader`); it waits 24 hours in public before anyone can apply it (`apply_grader`). `on_report` checks the report against the committed fingerprint and the pinned build before storing a certificate. After a set retires it is revealed and anyone can `challenge` an answer with a bond.
 - **OutLayer** runs the grader (`grader/`, Rust compiled to `wasm32-wasip2`) inside Intel TDX. Each set is an OutLayer secret that only the current grader build can read. The NEAR AI key is an author secret of the same build.
 - **NEAR AI Cloud** serves the models. For attested models the grader confirms `verifiable` before asking, and the certificate is marked sealed. Models from other providers run on their makers' servers, so the contract records that the maker saw the set, and keeps that record for good.
 - **Money exam and licences.** `twins/make_money_exam.py` generates the payment requests from templates with fresh names, amounts and accounts. Questions can carry a stake; grader 0.4.0 reports what wrong answers cost (`lost_milli`) and the contract pays it from the model's wallet (`fund_wallet`, `list_wallets`) to the scammer account. First answers per model and question are tallied, and `licence(model, skill)` returns whether the model passed, its score, its expiry and whether its maker saw the exam.
@@ -162,6 +162,7 @@ Everything network-specific lives in `web/network.js`. The site builds for testn
 - The page gets OutLayer's key through our relay, so in principle the relay could hand out a different key. The page shows the key's fingerprint; compare it with `outlayer` CLI before sealing something you care about.
 - Free-form hunts (made outside the page, without parts) can't be checked by code; for those a challenge is still decided by the contract owner.
 - A model's maker sees the questions unless the model runs in a TEE. Proctor records this; it can't prevent it.
+- A new grader build waits 24 hours in public before it can mark anything, but the contract code itself can still be upgraded at once: the accounts keep a full-access key during the hackathon. Every upgrade is public, and CI checks the code on chain is a build of this repo.
 
 ## Built at NEAR HACKATHON
 

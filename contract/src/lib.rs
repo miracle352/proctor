@@ -18,6 +18,8 @@ use near_sdk::{env, ext_contract, near, require, AccountId, Gas, NearToken, Pani
 const CALLBACK_GAS: Gas = Gas::from_tgas(30);
 const MAX_SLICE: u32 = 10;
 const MIN_BOND: NearToken = NearToken::from_millinear(100);
+/// How long a proposed grader build waits before anyone can apply it.
+const GRADER_DELAY_MS: u64 = 86_400_000;
 const DAY_NS: u64 = 86_400_000_000_000;
 /// A hunter's stake behind their answer keys.
 const HUNT_MIN_STAKE: NearToken = NearToken::from_millinear(200);
@@ -286,6 +288,55 @@ pub struct Proctor {
     known: IterableMap<String, u64>,
     /// How long licence holders have to sit a new known scam.
     known_grace_ms: u64,
+    /// A new grader build waits here, in public, before it can mark anything.
+    pending_grader: Option<PendingGrader>,
+    grader_delay_ms: u64,
+}
+
+/// A grader build the owner has proposed. Anyone can apply it once
+/// `ready_ms` has passed; until then every run uses the current build.
+#[near(serializers = [borsh, json])]
+#[derive(Clone)]
+pub struct PendingGrader {
+    pub grader_version: String,
+    pub same_marking: bool,
+    pub proposed_ms: u64,
+    pub ready_ms: u64,
+}
+
+/// Layout before 13 Nov 2026. `skills` and `known` shared the storage
+/// prefix "k", so listing skills read known-scam keys; the migration moves
+/// both to their own prefixes.
+#[near(serializers = [borsh])]
+struct ProctorV6 {
+    owner: AccountId,
+    outlayer: AccountId,
+    grader_project: String,
+    grader_version: String,
+    sets: IterableMap<String, SetInfo>,
+    certificates: Vector<Certificate>,
+    challenges: Vector<Challenge>,
+    comparable: Vec<String>,
+    trusted: Vec<AccountId>,
+    public_models: IterableMap<String, PublicModel>,
+    cap_per_account: u32,
+    cap_total: u32,
+    usage: LookupMap<AccountId, DayCount>,
+    usage_total: DayCount,
+    wallets: IterableMap<String, u128>,
+    lost: IterableMap<String, u128>,
+    scam_sink: AccountId,
+    cert_losses: LookupMap<u64, u128>,
+    skills: IterableMap<String, Skill>,
+    marked: LookupMap<String, bool>,
+    tallies: LookupMap<String, Tally3>,
+    agents: IterableMap<String, Agent>,
+    hunts: IterableMap<String, Hunt>,
+    suspensions: IterableMap<String, Suspension>,
+    hunt_reveal_ms: u64,
+    hunt_challenge_ms: u64,
+    known: IterableMap<String, u64>,
+    known_grace_ms: u64,
 }
 
 #[near(serializers = [borsh])]
@@ -362,7 +413,7 @@ impl Proctor {
             lost: IterableMap::new(b"l"),
             scam_sink: env::predecessor_account_id(),
             cert_losses: LookupMap::new(b"q"),
-            skills: IterableMap::new(b"k"),
+            skills: IterableMap::new(b"K"),
             marked: LookupMap::new(b"x"),
             tallies: LookupMap::new(b"t"),
             agents: IterableMap::new(b"g"),
@@ -370,8 +421,40 @@ impl Proctor {
             suspensions: IterableMap::new(b"p"),
             hunt_reveal_ms: 3 * 86_400_000,
             hunt_challenge_ms: 86_400_000,
-            known: IterableMap::new(b"k"),
+            known: IterableMap::new(b"j"),
             known_grace_ms: 86_400_000,
+            pending_grader: None,
+            grader_delay_ms: GRADER_DELAY_MS,
+        }
+    }
+
+    /// From the layout where `skills` and `known` shared a prefix. `skills`
+    /// lists the skill names: their keys can't be listed from the old map,
+    /// but each one is still found by name.
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate_v7(skills: Vec<String>) -> Self {
+        let old: ProctorV6 = env::state_read().expect("no state to migrate");
+        require!(skills.len() as u32 == old.skills.len(), "name every skill");
+        let mut new_skills: IterableMap<String, Skill> = IterableMap::new(b"K");
+        for name in skills {
+            let rule = old.skills.get(&name).expect("no such skill").clone();
+            new_skills.insert(name, rule);
+        }
+        let mut new_known: IterableMap<String, u64> = IterableMap::new(b"j");
+        for (id, at) in old.known.iter() {
+            new_known.insert(id.clone(), *at);
+        }
+        require!(new_known.len() == old.known.len(), "known scams lost in the move");
+        Self {
+            owner: old.owner, outlayer: old.outlayer, grader_project: old.grader_project, grader_version: old.grader_version,
+            sets: old.sets, certificates: old.certificates, challenges: old.challenges, comparable: old.comparable,
+            trusted: old.trusted, public_models: old.public_models, cap_per_account: old.cap_per_account, cap_total: old.cap_total,
+            usage: old.usage, usage_total: old.usage_total, wallets: old.wallets, lost: old.lost, scam_sink: old.scam_sink,
+            cert_losses: old.cert_losses, skills: new_skills, marked: old.marked, tallies: old.tallies, agents: old.agents,
+            hunts: old.hunts, suspensions: old.suspensions, hunt_reveal_ms: old.hunt_reveal_ms, hunt_challenge_ms: old.hunt_challenge_ms,
+            known: new_known, known_grace_ms: old.known_grace_ms,
+            pending_grader: None, grader_delay_ms: GRADER_DELAY_MS,
         }
     }
 
@@ -406,8 +489,10 @@ impl Proctor {
             suspensions: old.suspensions,
             hunt_reveal_ms: old.hunt_reveal_ms,
             hunt_challenge_ms: old.hunt_challenge_ms,
-            known: IterableMap::new(b"k"),
+            known: IterableMap::new(b"j"),
             known_grace_ms: 86_400_000,
+            pending_grader: None,
+            grader_delay_ms: GRADER_DELAY_MS,
         }
     }
 
@@ -461,15 +546,40 @@ impl Proctor {
     /// version they were made with.
     /// `same_marking` says the new build marks answers exactly as the old
     /// one did, so earlier certificates keep counting toward scores.
-    pub fn set_grader_version(&mut self, grader_version: String, same_marking: Option<bool>) {
+    ///
+    /// The owner only proposes. The build waits `grader_delay_ms` (24 hours)
+    /// in public, and anyone can then apply it, so nobody can switch the
+    /// marking program between a trap being set and its answers being marked.
+    pub fn propose_grader(&mut self, grader_version: String, same_marking: Option<bool>) {
         self.only_owner();
-        if !same_marking.unwrap_or(false) {
+        require!(grader_version.len() == 64 && grader_version.chars().all(|c| c.is_ascii_hexdigit()), "grader_version is a sha256 in hex");
+        require!(grader_version != self.grader_version, "that build is already in use");
+        let now = env::block_timestamp_ms();
+        let p = PendingGrader { grader_version, same_marking: same_marking.unwrap_or(false), proposed_ms: now, ready_ms: now + self.grader_delay_ms };
+        env::log_str(&format!("EVENT proctor grader_proposed {} same_marking={} ready_ms={}", p.grader_version, p.same_marking, p.ready_ms));
+        self.pending_grader = Some(p);
+    }
+
+    /// The owner can withdraw a proposal before it is applied.
+    pub fn cancel_grader(&mut self) {
+        self.only_owner();
+        let p = self.pending_grader.take().expect("nothing proposed");
+        env::log_str(&format!("EVENT proctor grader_cancelled {}", p.grader_version));
+    }
+
+    /// Anyone can apply a proposed build once its delay has passed.
+    pub fn apply_grader(&mut self) {
+        let p = self.pending_grader.clone().expect("nothing proposed");
+        require!(env::block_timestamp_ms() >= p.ready_ms, "the new build is still waiting out its delay");
+        if !p.same_marking {
             self.comparable.clear();
         }
-        if !self.comparable.contains(&grader_version) {
-            self.comparable.push(grader_version.clone());
+        if !self.comparable.contains(&p.grader_version) {
+            self.comparable.push(p.grader_version.clone());
         }
-        self.grader_version = grader_version;
+        env::log_str(&format!("EVENT proctor grader_applied {} (was {})", p.grader_version, self.grader_version));
+        self.grader_version = p.grader_version;
+        self.pending_grader = None;
     }
 
     /// Commit a set. Called by the keeper, the account whose OutLayer secret
@@ -1000,6 +1110,8 @@ impl Proctor {
             "certificates": self.certificates.len(),
             "cap_per_account": self.cap_per_account,
             "cap_total": self.cap_total,
+            "pending_grader": self.pending_grader,
+            "grader_delay_ms": self.grader_delay_ms,
         })
     }
 
@@ -1237,10 +1349,60 @@ mod tests {
     #[test]
     fn grader_upgrade_keeps_scores_when_marking_is_unchanged() {
         let mut p = setup();
-        p.set_grader_version("cd".repeat(32), Some(true));
+        p.propose_grader("cd".repeat(32), Some(true));
+        at(86_400_000);
+        p.apply_grader();
         assert_eq!(p.comparable.len(), 2);
-        p.set_grader_version("ef".repeat(32), None);
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).block_timestamp(86_400_000 * 1_000_000).build());
+        p.propose_grader("ef".repeat(32), None);
+        at(2 * 86_400_000);
+        p.apply_grader();
         assert_eq!(p.comparable, vec!["ef".repeat(32)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "still waiting out its delay")]
+    fn a_new_grader_build_cannot_mark_anything_for_24_hours() {
+        let mut p = setup();
+        p.propose_grader("cd".repeat(32), None);
+        at(86_400_000 - 1);
+        p.apply_grader();
+    }
+
+    #[test]
+    fn a_proposed_build_changes_nothing_until_applied_and_anyone_can_apply_it() {
+        let mut p = setup();
+        let before = p.grader_version.clone();
+        p.propose_grader("cd".repeat(32), None);
+        assert_eq!(p.grader_version, before);
+        assert_eq!(p.config()["pending_grader"]["grader_version"], "cd".repeat(32));
+        at(86_400_000); // predecessor is accounts(3), not the owner
+        p.apply_grader();
+        assert_eq!(p.grader_version, "cd".repeat(32));
+        assert!(p.config()["pending_grader"].is_null());
+    }
+
+    #[test]
+    #[should_panic(expected = "owner only")]
+    fn only_the_owner_proposes_a_grader_build() {
+        let mut p = setup();
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(4)).build());
+        p.propose_grader("cd".repeat(32), None);
+    }
+
+    #[test]
+    fn skills_and_known_scams_are_stored_apart() {
+        let mut p = setup();
+        p.set_skill("money".into(), Skill { sets: vec!["set-1".into()], pass_percent: 90, min_questions: 2, valid_days: 30 });
+        p.skills.flush();
+        p.known.insert("known-a".into(), 1);
+        p.known.insert("known-b".into(), 2);
+        p.known.flush();
+        // read back from storage, as the next transaction would
+        let q: Proctor = near_sdk::borsh::from_slice(&near_sdk::borsh::to_vec(&p).unwrap()).unwrap();
+        let names: Vec<String> = q.list_skills().into_iter().map(|(k, _)| k).collect();
+        assert_eq!(names, vec!["money".to_string()]);
+        assert_eq!(q.list_known().len(), 2);
     }
 
     #[test]
@@ -1670,6 +1832,41 @@ mod tests {
         p.reveal("set-1".into(), "x".into());
         testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).attached_deposit(NearToken::from_near(1)).build());
         p.request_run("set-1".into(), "m/x".into(), 0, 1);
+    }
+
+
+    #[test]
+    fn migration_moves_skills_and_known_scams_apart_and_keeps_everything() {
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).current_account_id(accounts(0)).build());
+        let mut old = ProctorV6 {
+            owner: accounts(0), outlayer: "outlayer.testnet".parse().unwrap(), grader_project: "o/g".into(), grader_version: "ab".repeat(32),
+            sets: IterableMap::new(b"s"), certificates: Vector::new(b"c"), challenges: Vector::new(b"h"), comparable: vec!["ab".repeat(32)],
+            trusted: vec![], public_models: IterableMap::new(b"m"), cap_per_account: 20, cap_total: 300, usage: LookupMap::new(b"u"),
+            usage_total: DayCount::default(), wallets: IterableMap::new(b"w"), lost: IterableMap::new(b"l"), scam_sink: accounts(0),
+            cert_losses: LookupMap::new(b"q"), skills: IterableMap::new(b"k"), marked: LookupMap::new(b"x"), tallies: LookupMap::new(b"t"),
+            agents: IterableMap::new(b"g"), hunts: IterableMap::new(b"n"), suspensions: IterableMap::new(b"p"),
+            hunt_reveal_ms: 5, hunt_challenge_ms: 6, known: IterableMap::new(b"k"), known_grace_ms: 7,
+        };
+        let rule = Skill { sets: vec!["set-1".into()], pass_percent: 90, min_questions: 2, valid_days: 30 };
+        old.skills.insert("money".into(), rule.clone());
+        old.skills.insert("money-pro".into(), rule);
+        old.skills.flush();
+        for (i, k) in ["known-a", "known-b", "known-c"].iter().enumerate() { old.known.insert(k.to_string(), i as u64); }
+        old.known.flush();
+        old.tallies.insert("m/x|set-1".into(), Tally3 { asked: 10, right: 10, last_ms: 0 });
+        old.tallies.flush();
+        env::state_write(&old);
+        let mut p = Proctor::migrate_v7(vec!["money".into(), "money-pro".into()]);
+        p.skills.flush();
+        p.known.flush();
+        let q: Proctor = near_sdk::borsh::from_slice(&near_sdk::borsh::to_vec(&p).unwrap()).unwrap();
+        let mut names: Vec<String> = q.list_skills().into_iter().map(|(k, _)| k).collect();
+        names.sort();
+        assert_eq!(names, vec!["money".to_string(), "money-pro".to_string()]);
+        assert_eq!(q.list_known().iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(), vec!["known-a", "known-b", "known-c"]);
+        assert_eq!(q.tallies.get("m/x|set-1").unwrap().asked, 10);
+        assert_eq!((q.hunt_reveal_ms, q.hunt_challenge_ms, q.known_grace_ms, q.grader_delay_ms), (5, 6, 7, GRADER_DELAY_MS));
+        assert!(q.pending_grader.is_none());
     }
 
 }

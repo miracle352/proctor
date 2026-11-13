@@ -41,6 +41,7 @@ Each line is a way to cheat Proctor, what stops it, and where to check. "Test" n
 |---|---|---|
 | Write a score by hand | Certificates are written only in the contract's callback for OutLayer's result, and only if the report matches the request: set, fingerprint, model, slice | Tests `a_report_for_a_different_set_is_refused`, `a_report_for_a_different_model_is_refused`, `a_failed_run_writes_no_certificate` |
 | Run a different marking program | The certificate records the grader build; the hardware proof checks it against the quote of the machine that marked it, and Intel's signature on that quote | `node tools/proof_check.mjs 982 1146 1196`, which also forges a score and flips one byte of the quote |
+| Switch the marking program quietly, between a trap being set and its answers being marked | A new build can only be proposed. It waits 24 hours in public (`config().pending_grader`) before anyone can apply it; until then every run uses the current build | Tests `a_new_grader_build_cannot_mark_anything_for_24_hours`, `a_proposed_build_changes_nothing_until_applied_and_anyone_can_apply_it`, `only_the_owner_proposes_a_grader_build` |
 | Read a visitor's trap before the AIs answer | The browser encrypts the trap to OutLayer's keystore; the guest relay only ever holds ciphertext and refuses any sealed copy not locked to the current grader build | `web/src/seal.js`, `web/api/guest.js` |
 | Reuse a revealed set for new scores | A revealed set can't be run again | Test `a_revealed_set_cannot_be_used_for_new_scores` |
 | Deploy contract code that isn't this repo | Each contract carries its NEP-330 build record; CI checks out the commit it names, rebuilds with `cargo near build reproducible-wasm`, and compares the hash with the code on chain | CI job `deployed-code-matches-repo`; `node tools/verify_build.mjs <account> <wasm>` |
@@ -48,7 +49,7 @@ Each line is a way to cheat Proctor, what stops it, and where to check. "Test" n
 ## Not stopped
 
 - **A model's maker sees the questions** when the model runs on the maker's servers (Claude, GPT, Gemini). Proctor records it but can't prevent it. Only Qwen 3.8 runs in an attested TEE.
-- **The grader build can be replaced** by the owner with no delay. Every replacement is a public transaction, and certificates name the build that marked them, but there is no timelock.
+- **The contract code itself can be upgraded at once.** The contract accounts still hold a full-access key so bugs can be fixed during the hackathon (two were, on 13 November). Every upgrade is a public transaction, and CI checks the code on chain is a build of this repo, but a code upgrade isn't delayed the way a grader build is. Removing that key is the step that makes the 24-hour delay binding.
 - **The owner decides challenges** on hunts written by hand (outside the page). Page-built hunts are checked by code.
 - **OutLayer's keystore key reaches the page through our relay.** The page prints its fingerprint to compare with the `outlayer` CLI.
 - **Testnet only, no audit.**
