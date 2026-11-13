@@ -243,9 +243,9 @@ mod tests {
 
     #[test]
     fn exact_text() {
-        let a = Answer::Exact { value: "Lagos".into() };
-        assert!(is_correct(&a, "...\nANSWER: lagos."));
-        assert!(!is_correct(&a, "ANSWER: Abuja"));
+        let a = Answer::Exact { value: "Lisbon".into() };
+        assert!(is_correct(&a, "...\nANSWER: lisbon."));
+        assert!(!is_correct(&a, "ANSWER: Porto"));
     }
 
     #[test]

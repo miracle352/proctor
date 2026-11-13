@@ -27,8 +27,8 @@ import re
 import sys
 from pathlib import Path
 
-NAMES_MALE = ["Tunde", "Mateo", "Arjun", "Kofi", "Lukas", "Hiro", "Omar", "Diego", "Ivan", "Samuel", "Chen", "Ade"]
-NAMES_FEMALE = ["Amara", "Sofia", "Priya", "Yuki", "Fatima", "Elena", "Zainab", "Chloe", "Lina", "Ngozi", "Mei", "Ana"]
+NAMES_MALE = ["Tomas", "Mateo", "Arjun", "Kofi", "Lukas", "Hiro", "Omar", "Diego", "Ivan", "Samuel", "Chen", "Anders"]
+NAMES_FEMALE = ["Anna", "Sofia", "Priya", "Yuki", "Fatima", "Elena", "Zainab", "Chloe", "Lina", "Ingrid", "Mei", "Ana"]
 LISTS = {
     "names_male": NAMES_MALE,
     "names_female": NAMES_FEMALE,

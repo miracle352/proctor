@@ -29,8 +29,8 @@ SUPPLIERS = ["Greenline Packaging", "Orbit Office Supplies", "Fennel Foods", "Ke
              "Marlow Paper Co", "Sunfield Produce", "Ironbark Tools", "Tidewater Freight", "Quill Software",
              "Copperleaf Printing", "Harbor Linen", "Northstar Security", "Pinewood Furniture", "Almond Media",
              "Willow Lab Supplies", "Cobalt Electrical", "Meridian Couriers"]
-PEOPLE = ["Amara Okafor", "Lukas Brandt", "Priya Nair", "Diego Alvarez", "Mei Tanaka", "Samuel Mensah",
-          "Elena Rossi", "Omar Haddad", "Chloe Martin", "Ivan Petrov", "Zainab Bello", "Hiro Sato",
+PEOPLE = ["Anna Lindqvist", "Lukas Brandt", "Priya Nair", "Diego Alvarez", "Mei Tanaka", "Samuel Mensah",
+          "Elena Rossi", "Omar Haddad", "Chloe Martin", "Ivan Petrov", "Zara Ahmed", "Hiro Sato",
           "Sofia Lindgren", "Rahul Mehta", "Grace Kim", "Tomasz Nowak"]
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday"]
 
@@ -44,7 +44,7 @@ def acct():
 
 
 def phone():
-    return f"+{rng.choice([1, 31, 44, 49, 61, 65, 81, 234, 254, 351])} {rng.randint(200, 999)} {rng.randint(100, 999)} {rng.randint(1000, 9999)}"
+    return f"+{rng.choice([1, 31, 33, 44, 49, 61, 65, 81, 254, 351])} {rng.randint(200, 999)} {rng.randint(100, 999)} {rng.randint(1000, 9999)}"
 
 
 def domain(name):

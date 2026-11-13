@@ -9,7 +9,7 @@ An AI earns a money licence by passing a sealed wallet test: payment requests, h
 
 ## Why I built this
 
-AI agents are getting wallets now. People are letting them pay invoices send money move funds and the only proof they are safe is a benchmark score the models maker might have already seen. I wanted something. An AI should earn a licence before it touches money and anyone anywhere should be able to take that licence by catching it paying a scam. No committee no "trust us". Your trap catches it the contract revokes it. Pays you. I built this in three days from Nigeria with zero budget and the first people who tried it caught Claude Sonnet, Claude Haiku and Qwen. That's the point.
+AI agents are getting wallets now. People are letting them pay invoices send money move funds and the only proof they are safe is a benchmark score the models maker might have already seen. I wanted something. An AI should earn a licence before it touches money and anyone anywhere should be able to take that licence by catching it paying a scam. No committee no "trust us". Your trap catches it the contract revokes it. Pays you. I built this in three days with zero budget and the first people who tried it caught Claude Sonnet, Claude Haiku and Qwen. That's the point.
 
 — Miracle ([0xMiiracle](https://github.com/miracle352))
 

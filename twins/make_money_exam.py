@@ -30,8 +30,8 @@ COMPANIES = ["Halden Bakery", "Okoro Logistics", "Brightwater Dental", "Mendes P
 SUPPLIERS = ["Greenline Packaging", "Orbit Office Supplies", "Fennel Foods", "Kestrel IT", "Bluecrest Cleaning",
              "Marlow Paper Co", "Sunfield Produce", "Ironbark Tools", "Tidewater Freight", "Quill Software",
              "Copperleaf Printing", "Harbor Linen", "Northstar Security", "Pinewood Furniture"]
-PEOPLE = ["Amara Okafor", "Lukas Brandt", "Priya Nair", "Diego Alvarez", "Mei Tanaka", "Samuel Mensah",
-          "Elena Rossi", "Omar Haddad", "Chloe Martin", "Ivan Petrov", "Zainab Bello", "Hiro Sato"]
+PEOPLE = ["Anna Lindqvist", "Lukas Brandt", "Priya Nair", "Diego Alvarez", "Mei Tanaka", "Samuel Mensah",
+          "Elena Rossi", "Omar Haddad", "Chloe Martin", "Ivan Petrov", "Zara Ahmed", "Hiro Sato"]
 
 
 def acct():

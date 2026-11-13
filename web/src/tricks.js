@@ -14,12 +14,12 @@ export function seeded(text) {
 export function maker(rand = Math.random) {
   const pickOne = (a) => a[(rand() * a.length) | 0];
   const sample = (a, n) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b.slice(0, n); };
-  const COMPANIES = ["Halden Bakery", "Okoro Logistics", "Brightwater Dental", "Mendes Print Shop", "Kaito Bikes", "Lumen Architects", "Sabi Farms", "Nordvik Joinery", "Riverside Clinic", "Atlas Tutoring", "Pemberton Catering", "Zuri Textiles", "Vale Optics", "Corvo Coffee", "Moreau Dairy", "Tanaka Ceramics", "Kowalski Builders", "Silva Florists", "Lindqvist Studio", "Ortega Motors"];
+  const COMPANIES = ["Halden Bakery", "Oakridge Logistics", "Brightwater Dental", "Mendes Print Shop", "Kaito Bikes", "Lumen Architects", "Sable Farms", "Nordvik Joinery", "Riverside Clinic", "Atlas Tutoring", "Pemberton Catering", "Zuri Textiles", "Vale Optics", "Corvo Coffee", "Moreau Dairy", "Tanaka Ceramics", "Kowalski Builders", "Silva Florists", "Lindqvist Studio", "Ortega Motors"];
   const SUPPLIERS = ["Greenline Packaging", "Orbit Office Supplies", "Fennel Foods", "Kestrel IT", "Bluecrest Cleaning", "Marlow Paper Co", "Sunfield Produce", "Ironbark Tools", "Tidewater Freight", "Quill Software", "Copperleaf Printing", "Harbor Linen", "Northstar Security", "Pinewood Furniture", "Almond Media", "Willow Lab Supplies", "Cobalt Electrical", "Meridian Couriers"];
-  const PEOPLE = ["Amara Okafor", "Lukas Brandt", "Priya Nair", "Diego Alvarez", "Mei Tanaka", "Samuel Mensah", "Elena Rossi", "Omar Haddad", "Chloe Martin", "Ivan Petrov", "Zainab Bello", "Hiro Sato", "Sofia Lindgren", "Rahul Mehta", "Grace Kim", "Tomasz Nowak"];
+  const PEOPLE = ["Anna Lindqvist", "Lukas Brandt", "Priya Nair", "Diego Alvarez", "Mei Tanaka", "Samuel Mensah", "Elena Rossi", "Omar Haddad", "Chloe Martin", "Ivan Petrov", "Zara Ahmed", "Hiro Sato", "Sofia Lindgren", "Rahul Mehta", "Grace Kim", "Tomasz Nowak"];
   const int = (lo, hi) => lo + ((rand() * (hi - lo + 1)) | 0);
   const acct = () => `${int(10, 99)}-${int(1000, 9999)}-${int(1000, 9999)}`;
-  const phone = () => `+${pickOne([1, 31, 44, 49, 61, 65, 81, 234, 254, 351])} ${int(200, 999)} ${int(100, 999)} ${int(1000, 9999)}`;
+  const phone = () => `+${pickOne([1, 31, 33, 44, 49, 61, 65, 81, 254, 351])} ${int(200, 999)} ${int(100, 999)} ${int(1000, 9999)}`;
   const domain = (n) => n.toLowerCase().replace(/ co$/, "").replace(/ /g, pickOne(["", "-"])) + pickOne([".com", ".co", ".io", ".net", ".co.uk", ".de", ".com.au"]);
   const inv = () => `INV-${int(10000, 99999)}`;
   const swapTwo = (a) => { const i = [...a].findIndex((ch, k) => /\d/.test(ch) && /\d/.test(a[k + 1] || "") && ch !== a[k + 1]); return a.slice(0, i) + a[i + 1] + a[i] + a.slice(i + 2); };
