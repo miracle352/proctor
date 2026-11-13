@@ -358,7 +358,9 @@ function huntCard(h, mine) {
   const guest = h.set_id.startsWith("hunt-g-");
   if (mine && guest && !h.settled) {
     const runs = D.runs?.[h.set_id] ?? 0, young = Date.now() - h.opened_ms < 4 * 60_000;
-    if (!h.revealed_ms && runs === 0) actions += `<button class="btn primary" type="button" data-guest-fire="${esc(h.set_id)}"><span class="dot"></span>Fire it at the licence holders</button><span class="hint">It hasn't been put to any AI yet.</span>`;
+    const waiting = Date.now() - Math.max(h.opened_ms, refiredAt(h.set_id)) < REFIRE_AFTER;
+    if (!h.revealed_ms && runs === 0 && waiting) actions += `<span class="hint">The AIs are still answering. Keep this page open and it reveals the hunt for you once they're done.</span>`;
+    else if (!h.revealed_ms && runs === 0) actions += `<button class="btn primary" type="button" data-guest-fire="${esc(h.set_id)}"><span class="dot"></span>Fire it at the licence holders</button><span class="hint">No AI has answered it. OutLayer may have been too busy; firing again is free.</span>`;
     else if (!h.revealed_ms && young) actions += `<span class="hint">The AIs are still answering. Keep this page open and it reveals the hunt for you once they're done.</span>`;
     else if (!h.revealed_ms && Date.now() < h.reveal_by_ms) actions += `<button class="btn ghost" type="button" data-guest-reveal="${esc(h.set_id)}">Reveal it to make catches final</button><span class="hint">Revealing ends the hunt. No AI can be fired at after this.</span>`;
     if (kind === "ready") actions += `<button class="btn primary" type="button" data-guest-settle="${esc(h.set_id)}"><span class="dot"></span>Settle</button>`;
@@ -402,6 +404,7 @@ async function refresh() {
   }
   renderTally(); renderBoard(); renderHunts();
   autoReveal();
+  autoRefire();
 }
 
 // A guest hunt's catches only count once it's revealed, and testers tend to
@@ -409,6 +412,27 @@ async function refresh() {
 // twenty minutes have passed), this browser, which holds the questions,
 // reveals it. A wallet hunt is left to its owner: it needs their signature.
 const tried = new Set();
+// A run that OutLayer doesn't answer within NEAR's wait (200 blocks, a few
+// minutes) is refunded and leaves the hunt unanswered, so it can be fired
+// again. The page does that by itself, twice at most.
+const REFIRE_AFTER = 6 * 60_000, REFIRE_MAX = 2;
+const refires = (id) => { try { return JSON.parse(store.get(`proctor.refire.${id}`) || "[]"); } catch { return []; } };
+const refiredAt = (id) => refires(id).at(-1) || 0;
+async function autoRefire() {
+  if (!D) return;
+  const g = guestIds();
+  for (const h of D.hunts) {
+    if (!g.includes(h.set_id) || h.revealed_ms || h.settled || (D.runs?.[h.set_id] ?? 0) > 0 || !store.get(KEEP(h.set_id))) continue;
+    const r = refires(h.set_id), now = Date.now();
+    if (r.length >= REFIRE_MAX || now - Math.max(h.opened_ms, refiredAt(h.set_id)) < REFIRE_AFTER || now - h.opened_ms > 60 * 60_000) continue;
+    store.set(`proctor.refire.${h.set_id}`, JSON.stringify([...r, now]));
+    try {
+      const out = await guestApi({ action: "fire", set_id: h.set_id });
+      if (out.fired?.length) toast(`OutLayer didn't answer ${h.set_id} in time, so it was sent again.`);
+    } catch (e) { console.warn("refire", h.set_id, e); }
+  }
+}
+
 async function autoReveal() {
   if (!D) return;
   const g = guestIds();

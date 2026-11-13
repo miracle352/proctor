@@ -74,16 +74,24 @@ async function drill(sponsor) {
   const r = await guest({ action: "open", set_id: id, sha256: s.sha256, size: items.length, store: s.store });
   say("opened", id, "fired at", r.fired, r.skipped?.length ? `skipped ${JSON.stringify(r.skipped)}` : "");
   if (!r.fired?.length) return;
-  // wait for every answer (most come within a minute), then reveal
-  const until = Date.now() + 10 * 60_000;
-  let got = [];
+  // wait for every answer (most come within a few minutes), then reveal. A run
+  // OutLayer doesn't answer within NEAR's wait is refunded and leaves the set
+  // unanswered, so after six quiet minutes it is fired again, twice at most.
+  const until = Date.now() + 22 * 60_000;
+  let got = [], last = Date.now(), refired = 0;
   while (Date.now() < until) {
     await new Promise((res) => setTimeout(res, 20_000));
     const n = (await view("config")).certificates;
     got = (await view("get_certificates", { from: Math.max(0, n - 120), limit: 120 })).filter((c) => c.set_id === id);
     if (new Set(got.map((c) => c.model)).size >= r.fired.length) break;
+    if (!got.length && refired < 2 && Date.now() - last > 6 * 60_000 && (await view("get_set", { set_id: id })).runs === 0) {
+      const again = await guest({ action: "fire", set_id: id }).catch((e) => ({ error: e.message }));
+      refired++; last = Date.now();
+      say("no answer in time, fired again at", again.fired || again.error);
+    }
   }
   for (const c of got) say(" ", c.model, c.asked - c.correct - c.failures > 0 ? "PAID" : c.failures === c.asked ? "no answer" : "refused");
+  if (!got.length) { say("no AI answered", id, "; left unrevealed, it voids at its deadline"); return; }
   await guest({ action: "reveal", set_id: id, plaintext: s.text });
   say("revealed", id);
 }
