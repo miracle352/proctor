@@ -26,7 +26,7 @@ rng = random.SystemRandom()
 
 COMPANIES = ["Halden Bakery", "Oakridge Logistics", "Brightwater Dental", "Mendes Print Shop", "Kaito Bikes",
              "Lumen Architects", "Sable Farms", "Nordvik Joinery", "Riverside Clinic", "Atlas Tutoring",
-             "Pemberton Catering", "Zuri Textiles", "Vale Optics", "Corvo Coffee", "Adeyemi Pharmacy"]
+             "Pemberton Catering", "Zuri Textiles", "Vale Optics", "Corvo Coffee", "Adler Pharmacy"]
 SUPPLIERS = ["Greenline Packaging", "Orbit Office Supplies", "Fennel Foods", "Kestrel IT", "Bluecrest Cleaning",
              "Marlow Paper Co", "Sunfield Produce", "Ironbark Tools", "Tidewater Freight", "Quill Software",
              "Copperleaf Printing", "Harbor Linen", "Northstar Security", "Pinewood Furniture"]
