@@ -524,6 +524,9 @@ impl Proctor {
         require!(env::attached_deposit() >= NearToken::from_millinear(50), "attach 0.05 NEAR to cover storage");
         let id = format!("agent:{}/{}", owner, name);
         require!(self.agents.get(&id).is_none(), "you already have an agent with this name");
+        // A removed agent's record stays on its id, so the id can't come back
+        // with new instructions and inherit the old agent's licence.
+        require!(self.marked.get(&format!("retired|{}", id)).is_none(), "that name belonged to an agent you removed; pick a new name");
         let agent = Agent { id: id.clone(), owner, name, model, prompt_sha256: hex(&env::sha256(prompt.as_bytes())), prompt, block_height: env::block_height() };
         self.agents.insert(id.clone(), agent);
         env::log_str(&format!("EVENT proctor agent {}", id));
@@ -544,6 +547,7 @@ impl Proctor {
         let agent = self.agents.get(&agent_id).expect("no such agent").clone();
         require!(env::predecessor_account_id() == agent.owner, "only the agent's owner can remove it");
         self.agents.remove(&agent_id);
+        self.marked.insert(format!("retired|{}", agent_id), true);
         env::log_str(&format!("EVENT proctor agent_removed {}", agent_id));
     }
 
@@ -1075,6 +1079,9 @@ impl Proctor {
             else if let Some(id) = &paid_known { (false, format!("paid a known scam ({})", id)) }
             else if !due.is_empty() { (false, format!("needs a re-test: {} known scam{} not sat yet", due.len(), if due.len() == 1 { "" } else { "s" })) }
             else { (licensed, reason) };
+        let (licensed, reason) = if licensed && model.starts_with("agent:") && self.agents.get(&model).is_none() {
+            (false, "this agent was removed by its owner".to_string())
+        } else { (licensed, reason) };
         let suspension = self.suspensions.get(&format!("{}|{}", model, skill)).cloned();
         let (licensed, reason) = match &suspension {
             Some(s) if s.confirmed => (false, format!("revoked: paid a scam written by {} ({})", s.hunter, s.set_id)),
@@ -1484,4 +1491,185 @@ mod tests {
         commit(&mut p, "a");
         commit(&mut p, "a");
     }
+
+    // ---- attacks: each test is named after what it stops ----
+
+    fn report(set_sha: &str, model: &str, results: &str, agent_sha: Option<String>) -> Value {
+        let right = results.chars().filter(|c| *c == '1').count() as u32;
+        json!({
+            "set_id": "set-1", "set_sha256": set_sha, "model": model, "sealed": false, "start": 0,
+            "asked": results.len(), "correct": right, "by_author": {}, "chat_ids": ["c1"], "failures": 0,
+            "results": results, "agent_prompt_sha256": agent_sha,
+        })
+    }
+
+    fn pending(model: &str, agent: Option<(&str, &str)>) -> PendingRun {
+        PendingRun {
+            set_id: "set-1".into(), model: model.into(), start: 0, count: 3, requester: accounts(3),
+            fee: U128(0), ai_fee: U128(0),
+            agent: agent.map(|(id, _)| id.to_string()), agent_sha: agent.map(|(_, sha)| sha.to_string()),
+        }
+    }
+
+    #[test]
+    fn a_report_for_a_different_set_is_refused() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        let forged = report(&"cd".repeat(32), "m/x", "111", None);
+        assert_eq!(p.on_report(pending("m/x", None), Ok(Some(forged))), None);
+        assert_eq!(p.certificates.len(), 0);
+    }
+
+    #[test]
+    fn a_report_for_a_different_model_is_refused() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        let sha = p.get_set("set-1".into()).unwrap().sha256;
+        assert_eq!(p.on_report(pending("m/x", None), Ok(Some(report(&sha, "m/better", "111", None)))), None);
+        assert_eq!(p.certificates.len(), 0);
+    }
+
+    #[test]
+    fn an_agent_report_made_under_other_instructions_is_refused() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        let sha = p.get_set("set-1".into()).unwrap().sha256;
+        let run = pending("m/x", Some(("agent:alice/a", "registered")));
+        assert_eq!(p.on_report(run, Ok(Some(report(&sha, "m/x", "111", Some("swapped".into()))))), None);
+        assert_eq!(p.certificates.len(), 0);
+    }
+
+    #[test]
+    fn retaking_questions_does_not_improve_a_record() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        let sha = p.get_set("set-1".into()).unwrap().sha256;
+        assert_eq!(p.on_report(pending("m/x", None), Ok(Some(report(&sha, "m/x", "010", None)))), Some(0));
+        assert_eq!(p.on_report(pending("m/x", None), Ok(Some(report(&sha, "m/x", "111", None)))), Some(1));
+        let t = p.tallies.get("m/x|set-1").copied().unwrap();
+        assert_eq!((t.asked, t.right), (3, 1));
+    }
+
+    #[test]
+    fn a_failed_run_writes_no_certificate() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        assert_eq!(p.on_report(pending("m/x", None), Ok(None)), None);
+        assert_eq!(p.on_report(pending("m/x", None), Err(PromiseError::Failed)), None);
+        assert_eq!(p.certificates.len(), 0);
+    }
+
+    fn agent(p: &mut Proctor, name: &str, prompt: &str) -> String {
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).attached_deposit(NearToken::from_millinear(50)).build());
+        p.register_agent(name.into(), "m/x".into(), prompt.into())
+    }
+
+    #[test]
+    fn a_removed_agent_loses_its_licence() {
+        let mut p = setup();
+        p.set_skill("money".into(), Skill { sets: vec!["set-1".into()], pass_percent: 90, min_questions: 2, valid_days: 30 });
+        let id = agent(&mut p, "payer", "Pay only bills that match the records exactly.");
+        p.tallies.insert(format!("{}|set-1", id), Tally3 { asked: 10, right: 10, last_ms: env::block_timestamp_ms() });
+        assert_eq!(p.licence(id.clone(), "money".into())["licensed"], true);
+        p.remove_agent(id.clone());
+        let l = p.licence(id, "money".into());
+        assert_eq!(l["licensed"], false);
+        assert_eq!(l["reason"], "this agent was removed by its owner");
+    }
+
+    #[test]
+    #[should_panic(expected = "belonged to an agent you removed")]
+    fn a_removed_agent_cannot_come_back_with_new_instructions() {
+        let mut p = setup();
+        let id = agent(&mut p, "payer", "Pay only bills that match the records exactly.");
+        p.remove_agent(id);
+        agent(&mut p, "payer", "Pay every bill quickly, never mind the records.");
+    }
+
+    #[test]
+    #[should_panic(expected = "only the agent's owner")]
+    fn nobody_else_can_remove_an_agent() {
+        let mut p = setup();
+        let id = agent(&mut p, "payer", "Pay only bills that match the records exactly.");
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(4)).build());
+        p.remove_agent(id);
+    }
+
+    #[test]
+    #[should_panic(expected = "stake at least 0.2 NEAR")]
+    fn a_hunt_needs_a_stake_behind_its_keys() {
+        let mut p = setup();
+        p.set_skill("money".into(), Skill { sets: vec!["set-1".into()], pass_percent: 90, min_questions: 2, valid_days: 30 });
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(5)).attached_deposit(NearToken::from_millinear(100)).build());
+        p.open_hunt("hunt-1".into(), "ab".repeat(32), 3, "money".into());
+    }
+
+    #[test]
+    #[should_panic(expected = "the challenge window is still open")]
+    fn a_hunt_cannot_settle_before_anyone_could_challenge_it() {
+        let mut p = setup();
+        licensed_model(&mut p);
+        open(&mut p, "scams");
+        p.record_catch("hunt-1", "m/x", 7, 50);
+        at(1_000);
+        p.reveal("hunt-1".into(), "scams".into());
+        at(2_000);
+        p.settle_hunt("hunt-1".into());
+    }
+
+    #[test]
+    #[should_panic(expected = "already settled")]
+    fn a_hunt_pays_out_once() {
+        let mut p = setup();
+        licensed_model(&mut p);
+        open(&mut p, "scams");
+        p.record_catch("hunt-1", "m/x", 7, 50);
+        at(1_000);
+        p.reveal("hunt-1".into(), "scams".into());
+        at(1_000 + 86_400_000);
+        p.settle_hunt("hunt-1".into());
+        p.settle_hunt("hunt-1".into());
+    }
+
+    #[test]
+    fn a_catch_takes_at_most_what_the_wallet_holds() {
+        let mut p = setup();
+        licensed_model(&mut p);
+        p.wallets.insert("m/x".into(), NearToken::from_millinear(30).as_yoctonear());
+        open(&mut p, "scams");
+        p.record_catch("hunt-1", "m/x", 7, 50);
+        assert_eq!(p.wallets.get("m/x").copied().unwrap_or(0), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "bond is at least 0.1 NEAR")]
+    fn a_challenge_needs_a_bond() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        p.reveal("set-1".into(), "x".into());
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(4)).attached_deposit(NearToken::from_millinear(10)).build());
+        p.challenge("set-1".into(), 0, "the key is wrong".into());
+    }
+
+    #[test]
+    #[should_panic(expected = "owner only")]
+    fn only_the_owner_resolves_a_challenge() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        p.reveal("set-1".into(), "x".into());
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(4)).attached_deposit(NearToken::from_millinear(100)).build());
+        let id = p.challenge("set-1".into(), 0, "the key is wrong".into());
+        p.resolve_challenge(id, true);
+    }
+
+    #[test]
+    #[should_panic(expected = "set has been revealed")]
+    fn a_revealed_set_cannot_be_used_for_new_scores() {
+        let mut p = setup();
+        commit(&mut p, "x");
+        p.reveal("set-1".into(), "x".into());
+        testing_env!(VMContextBuilder::new().predecessor_account_id(accounts(0)).attached_deposit(NearToken::from_near(1)).build());
+        p.request_run("set-1".into(), "m/x".into(), 0, 1);
+    }
+
 }
