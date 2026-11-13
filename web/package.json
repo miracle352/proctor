@@ -1,5 +1,5 @@
 {
-  "name": "proctor-web",
+  "name": "revoke-web",
   "private": true,
   "type": "module",
   "scripts": {

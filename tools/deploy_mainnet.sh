@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Put Proctor on NEAR mainnet. Nothing is deployed there yet; this is the
+# Put Revoke on NEAR mainnet. Nothing is deployed there yet; this is the
 # whole procedure, so it's one command when someone funds it.
 #
 #   OWNER=you.near tools/deploy_mainnet.sh            # prints every step, sends nothing
 #   OWNER=you.near SEND=1 tools/deploy_mainnet.sh     # does it
 #
-# What it costs, roughly: about 5 NEAR of storage for the Proctor contract
+# What it costs, roughly: about 5 NEAR of storage for the Revoke contract
 # and 2 for the vault (refunded if they are deleted), 0.2 NEAR per sealed set
 # stored with OutLayer, and per question asked: OutLayer's execution fee plus
 # the model's NEAR AI Cloud price. The licence check itself, licence(), is a
@@ -17,7 +17,7 @@
 # and give the Vercel functions NETWORK=mainnet plus the same names without VITE_.
 set -euo pipefail
 
-OWNER=${OWNER:?set OWNER to the mainnet account that will own Proctor}
+OWNER=${OWNER:?set OWNER to the mainnet account that will own Revoke}
 SEND=${SEND:-0}
 APP=app.$OWNER
 VAULT=vault.$OWNER

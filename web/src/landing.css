@@ -5,7 +5,7 @@
 .hall { position: absolute; inset: 0 0 auto 0; height: min(118svh, 100%); z-index: -1; overflow: hidden; }
 .hall img { position: absolute; inset: -4%; width: 108%; height: 108%; object-fit: cover; object-position: 50% 40%; transform: translate3d(var(--px, 0), var(--py, 0), 0) scale(var(--zoom, 1.06)); will-change: transform; }
 .hall-base { opacity: 0.55; filter: contrast(0.9); }
-/* the proctor's lamp: a sharper, darker patch that wanders across the hall and follows the pointer */
+/* the exam-hall lamp: a sharper, darker patch that wanders across the hall and follows the pointer */
 .hall-lit { filter: contrast(1.35) brightness(0.82); -webkit-mask-image: radial-gradient(circle var(--r, 260px) at var(--mx, 70%) var(--my, 45%), #000 0, rgb(0 0 0 / 0.55) 45%, transparent 100%); mask-image: radial-gradient(circle var(--r, 260px) at var(--mx, 70%) var(--my, 45%), #000 0, rgb(0 0 0 / 0.55) 45%, transparent 100%); }
 .hall::after { content: ""; position: absolute; inset: 0; background:
   linear-gradient(180deg, rgb(243 243 244 / 0.92) 0%, rgb(243 243 244 / 0.35) 22%, rgb(243 243 244 / 0.25) 45%, rgb(243 243 244 / 0.85) 70%, var(--paper) 84%),

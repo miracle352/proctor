@@ -1,10 +1,10 @@
 {
-  "name": "proctor-mcp",
+  "name": "revoke-mcp",
   "version": "0.1.0",
-  "description": "MCP server for Proctor: check an AI's money licence on NEAR before letting it pay, and set traps for licensed AIs.",
+  "description": "MCP server for Revoke: check an AI's money licence on NEAR before letting it pay, and set traps for licensed AIs.",
   "type": "module",
   "bin": {
-    "proctor-mcp": "server.mjs"
+    "revoke-mcp": "server.mjs"
   },
   "license": "MIT",
   "dependencies": {

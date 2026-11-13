@@ -1,6 +1,6 @@
 // GET /api/proof?cert=N — everything needed to check certificate N against
 // the hardware that produced it, gathered from public sources:
-//   - the certificate, from the Proctor contract;
+//   - the certificate, from the Revoke contract;
 //   - the grader's report as OutLayer handed it back (resolve_execution on
 //     outlayer, a few blocks before the certificate), with its request id;
 //   - OutLayer's attestation for that request: the Intel TDX quote and the

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Proctor app: test an AI, write questions, check a score</title>
+  <title>Revoke app: test an AI, write questions, check a score</title>
   <meta name="description" content="Run a sealed exam on an AI model from your NEAR wallet and watch every answer get marked and recorded.">
   <meta name="theme-color" content="#f3f3f4">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -11,7 +11,7 @@
 <body class="app">
   <a class="skip" href="#main">Skip to the app</a>
   <header class="nav stuck">
-    <a class="brand" href="/" aria-label="Proctor home"><span id="logo"></span>proctor</a>
+    <a class="brand" href="/" aria-label="Revoke home"><span id="logo"></span>revoke</a>
     <nav aria-label="Pages">
       <a href="/hunt">Set a trap</a>
       <a href="/record">Licences</a>
@@ -101,7 +101,7 @@
       <div class="card wallet-card">
         <div class="wc-head">
           <h2><span class="n">3</span>Give it a wallet it can't misuse</h2>
-          <p class="hint">Your agent gets its own NEAR account with a single key that can do one thing: ask this wallet to pay someone. NEAR refuses everything else that key tries. Every payment asks Proctor for the licence first; the moment a hunter catches your agent, the wallet freezes and what's left comes back to you.</p>
+          <p class="hint">Your agent gets its own NEAR account with a single key that can do one thing: ask this wallet to pay someone. NEAR refuses everything else that key tries. Every payment asks Revoke for the licence first; the moment a hunter catches your agent, the wallet freezes and what's left comes back to you.</p>
         </div>
         <form id="wallet-form" class="wallet-form" autocomplete="off">
           <label>Which licence it follows<select name="model" id="wallet-model"></select></label>
@@ -139,7 +139,7 @@
         </li>
         <li class="card" id="lock-card">
           <h2><span class="n">2</span>Lock it inside OutLayer</h2>
-          <p class="hint">OutLayer keeps the file encrypted so that only Proctor's marking program can open it, and only inside secure hardware. Run this once with OutLayer's tool, signed in as the same NEAR account.</p>
+          <p class="hint">OutLayer keeps the file encrypted so that only Revoke's marking program can open it, and only inside secure hardware. Run this once with OutLayer's tool, signed in as the same NEAR account.</p>
           <pre class="cmd" id="lock-cmd">Build the sealed file first.</pre>
           <button class="btn ghost small" type="button" id="copy-lock">Copy command</button>
         </li>
@@ -161,7 +161,7 @@
     <section class="view" id="view-check" aria-labelledby="check-h" hidden>
       <div class="view-head">
         <h1 id="check-h">Check a score for yourself</h1>
-        <p class="sub">Someone shows you a Proctor score. Enter its certificate number and see exactly what was recorded, by which marking program, against which sealed set.</p>
+        <p class="sub">Someone shows you a Revoke score. Enter its certificate number and see exactly what was recorded, by which marking program, against which sealed set.</p>
       </div>
       <div class="check-grid">
         <div class="card">

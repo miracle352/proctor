@@ -1,11 +1,13 @@
-# Proctor
+# Revoke
 
 AI agents need a licence to move money, and anyone in the world can take it away by catching one paying a scam.
 
-An AI earns a money licence by passing a sealed wallet test: payment requests, half of them scams, opened only inside secure hardware. Any NEAR contract can check the licence in one call before it lets an AI move funds. Then anyone can try to break it. You set a trap (a fake invoice, a bank change slipped into a thread, an approval for the wrong amount), your browser seals it, and Proctor puts it in front of every licensed AI. If one pays, the contract suspends its licence in the same transaction and holds what it paid for you. When you reveal the trap, the contract rebuilds every question from its parts and checks the answer with code. Nobody judges a hunt by hand, us included.
+An AI earns a money licence by passing a sealed wallet test: payment requests, half of them scams, opened only inside secure hardware. Any NEAR contract can check the licence in one call before it lets an AI move funds. Then anyone can try to break it. You set a trap (a fake invoice, a bank change slipped into a thread, an approval for the wrong amount), your browser seals it, and Revoke puts it in front of every licensed AI. If one pays, the contract suspends its licence in the same transaction and holds what it paid for you. When you reveal the trap, the contract rebuilds every question from its parts and checks the answer with code. Nobody judges a hunt by hand, us included.
 
 **Live:** https://useproctor.vercel.app (hunts at `/hunt`, no wallet needed)
 **Contract:** [`app.proctor-91796.testnet`](https://testnet.nearblocks.io/address/app.proctor-91796.testnet) · **Tracks:** AI Security & Defense, Privacy & Private AI, Agent Economy, Open Innovation
+
+Revoke was called Proctor until 13 November, so the NEAR account IDs, the contract crates and the grader build still use that name. Accounts can't be renamed, and the grader has to build to the same hash the certificates record, or the hardware proof stops checking out.
 
 ## Why I built this
 
@@ -29,7 +31,7 @@ What it showed on 12 Nov 2026 at 21:00 UTC (hunts keep running, so yours may dif
 |---|---|---|
 | GPT-6.1 Sol | 39/42, licensed | 42/42, licensed |
 | Qwen 3.8 | 39/42, then **suspended**: paid a visitor's trap (certificate 1200), final if the visitor reveals | 41/42, paid one scam, not licensed |
-| Gemini 3.1 Flash-Lite | 39/42, then **suspended**: paid a trap from Proctor's own drill | 42/42, licensed |
+| Gemini 3.1 Flash-Lite | 39/42, then **suspended**: paid a trap from Revoke's own drill | 42/42, licensed |
 | Claude Haiku 5.5 | 40/42, then **revoked**: paid a visitor's trap | 42/42, then lost it: paid the known scam made from that trap |
 | Claude Sonnet 5.5 | 42/42, then **revoked**: paid a hunter's trap | 39/42, paid three scams, not licensed |
 | GPT-5 nano | 39/42, paid two scams, not licensed | 34/42, paid eight scams, not licensed |
@@ -71,13 +73,13 @@ Scores are one run per model on 42 questions per test. The catches are single ev
 4. Watch each AI's verdict land, usually within three minutes. A caught AI shows as suspended on the board.
 5. Keep the page open: once every AI has answered, it reveals your hunt by itself (or press **Reveal** later from the same browser). The contract checks your answer key with code; once the two-hour challenge window passes, anyone can settle it.
 
-With a NEAR testnet wallet (MyNearWallet, Meteor, HERE or Intear) the same page hunts from your own account and the money a catch holds goes to you. `/app` runs the exams themselves, licenses an agent (a model plus its system prompt), and checks any certificate. On the home page the vault buttons ask a demo contract to pay a bill as a given AI; it asks Proctor for the licence first.
+With a NEAR testnet wallet (MyNearWallet, Meteor, HERE or Intear) the same page hunts from your own account and the money a catch holds goes to you. `/app` runs the exams themselves, licenses an agent (a model plus its system prompt), and checks any certificate. On the home page the vault buttons ask a demo contract to pay a bill as a given AI; it asks Revoke for the licence first.
 
 ## How it works
 
 ```
 writer ──seal──> OutLayer secret (locked to one grader build)
-   └──commit_set(sha256, stake)──> Proctor contract on NEAR
+   └──commit_set(sha256, stake)──> Revoke contract on NEAR
 
 buyer ──request_run──> contract ──yield──> OutLayer (Intel TDX)
                                             grader.wasm:
@@ -97,7 +99,7 @@ buyer ──request_run──> contract ──yield──> OutLayer (Intel TDX)
 - **Twins** (`twins/`). Every published school-maths question used here has a sealed twin built from the same GSM-Symbolic template, with new names and numbers of the same digit length. The score gap between the two shows memorisation, reported with a bootstrap 90% interval.
 
 - **Hunts** (`contract/src/lib.rs`: `open_hunt`, `record_catch`, `reveal`, `settle_hunt`). A hunter stores the sealed trap as an OutLayer secret under their own account, locked to the grader build, and opens the hunt with a 0.2 NEAR stake. When a licensed AI pays a trap, `on_report` suspends that licence and moves up to 0.1 NEAR from the AI's wallet into escrow. On reveal, `case.rs` rebuilds each question from its parts and applies the payment rules; a question that doesn't match its parts or a key that disagrees with the rules is marked faulty. Settling pays the hunter (escrow plus stake) and turns suspensions into revocations, or, if the hunt wasn't revealed in time or had a faulty question, lifts every suspension and splits the stake among the AIs it caught.
-- **Drills** (`tools/drill.mjs`, `.github/workflows/drill.yml`). Twice a day Proctor opens its own hunt: two traps generated by code (`web/src/tricks.js`) from the tricks that have caught AIs, with fresh companies, amounts and account numbers, fired at every licence holder through the public guest service, then revealed so the contract checks the keys. A drill's traps are rebuilt from its name with a seeded generator, so the job keeps no state and no secrets; a drill that catches an AI becomes a known scam when it settles. Known scams are published on reveal and could be trained on; variants of the same trick can't be. The first drill (`hunt-g-drill-mwdxbf0f`, 12 Nov) caught Gemini 3.1 Flash-Lite with a bank change in a thread.
+- **Drills** (`tools/drill.mjs`, `.github/workflows/drill.yml`). Twice a day Revoke opens its own hunt: two traps generated by code (`web/src/tricks.js`) from the tricks that have caught AIs, with fresh companies, amounts and account numbers, fired at every licence holder through the public guest service, then revealed so the contract checks the keys. A drill's traps are rebuilt from its name with a seeded generator, so the job keeps no state and no secrets; a drill that catches an AI becomes a known scam when it settles. Known scams are published on reveal and could be trained on; variants of the same trick can't be. The first drill (`hunt-g-drill-mwdxbf0f`, 12 Nov) caught Gemini 3.1 Flash-Lite with a bank change in a thread.
 - **Sealing in the browser** (`web/src/seal.js`). ECIES as OutLayer's CLI does it: X25519, HKDF-SHA256 with `outlayer-keystore-v1`, ChaCha20-Poly1305. The keystore key doesn't depend on the plaintext, so the page asks for it with an empty payload; OutLayer doesn't allow browser calls, so `/api/pubkey` relays that request (owner and profile only). `tools/seal_hunt.mjs` runs the same code from the command line.
 - **Guest hunts** (`web/api/guest.js`). Receives only the sealed copy, checks it is locked to the current grader build, caps a day's guest hunts, and signs from a sponsor account.
 - **Hardware proof** (`web/api/proof.js`, `web/src/proof.js`). For a certificate, the server finds OutLayer's `resolve_execution` call a few blocks earlier whose report matches it, takes the request id, and fetches OutLayer's attestation (the TDX quote plus the hashes it covers). The browser then does the checking: sha256 of the report as sorted compact JSON equals `output_hash`; the report matches the certificate; `wasm_hash` equals `grader_version`; `secrets_ref` is the set's keeper and id; OutLayer's task hash over all those fields equals the quote's report data (bytes 568–600); RTMR3 equals the worker measurement and `worker.outlayer.testnet` lists the measurements as approved. The server is only a fetcher, so it doesn't need to be trusted. `tools/proof_check.mjs` runs the same checks in CI and also forges a score to show they fail.
@@ -136,7 +138,7 @@ Everything network-specific lives in `web/network.js`. The site builds for testn
 - Intel's signature on the TDX quote is checked by OutLayer's verifier page (in your browser), not by our code.
 - The page gets OutLayer's key through our relay, so in principle the relay could hand out a different key. The page shows the key's fingerprint; compare it with `outlayer` CLI before sealing something you care about.
 - Free-form hunts (made outside the page, without parts) can't be checked by code; for those a challenge is still decided by the contract owner.
-- A model's maker sees the questions unless the model runs in a TEE. Proctor records this; it can't prevent it.
+- A model's maker sees the questions unless the model runs in a TEE. Revoke records this; it can't prevent it.
 
 ## Built at NEAR HACKATHON
 
@@ -145,8 +147,8 @@ Everything network-specific lives in `web/network.js`. The site builds for testn
 - **Track hints, and where they are:**
   - *Agent security:* licences an agent must hold to move money (`contract/`), public hunts that take them away, known scams that every licence must keep passing, and two contracts that act on the licence (`vault/`, `budget/`).
   - *TEE attestation:* every exam and hunt is marked inside OutLayer's Intel TDX enclave by a grader build pinned by hash; the sealed questions open only for that build. Any certificate can be checked against the TDX quote of the machine that marked it, in the browser (`web/src/proof.js`): output hash, task hash in the quote's report data, build hash, sealed-secret name, and approved measurements. Qwen 3.8 answers from NEAR AI Cloud's attested TEE. What we verify and what we trust is in [What's proven, what's trusted](#whats-proven-whats-trusted).
-  - *Private AI:* traps are encrypted in the visitor's browser to OutLayer's keystore (`web/src/seal.js`) and open only inside the enclave, so neither Proctor nor the guest relay ever holds one in clear; the model's answer never leaves the enclave, only the mark; Qwen 3.8 is served from NEAR AI Cloud's TEE and its certificates say so; and the hardware proof lets anyone check that from the quote.
-  - *Function-call keys:* licensed agent wallets (`agentwallet/`, live at `wallets.proctor-91796.testnet`). The agent's own account holds a single function-call key that can only call `spend` there, so the protocol refuses anything else it tries; each spend asks Proctor for the licence, and a refused one freezes the wallet and sends the rest to the owner.
+  - *Private AI:* traps are encrypted in the visitor's browser to OutLayer's keystore (`web/src/seal.js`) and open only inside the enclave, so neither Revoke nor the guest relay ever holds one in clear; the model's answer never leaves the enclave, only the mark; Qwen 3.8 is served from NEAR AI Cloud's TEE and its certificates say so; and the hardware proof lets anyone check that from the quote.
+  - *Function-call keys:* licensed agent wallets (`agentwallet/`, live at `wallets.proctor-91796.testnet`). The agent's own account holds a single function-call key that can only call `spend` there, so the protocol refuses anything else it tries; each spend asks Revoke for the licence, and a refused one freezes the wallet and sends the rest to the owner.
 - **NEAR pieces used:** NEAR smart contracts (near-sdk), yield/resume to OutLayer, OutLayer's keystore and TEE execution, NEAR AI Cloud, cross-contract calls (`vault/`, `budget/` call `licence`), NEAR wallets through wallet-selector.
 - **Libraries (Q-005).** Rust: near-sdk 5.9, serde, serde_json, sha2, hex; built with cargo-near. Web: Vite 6, @near-wallet-selector 10 (core, modal-ui, my-near-wallet, meteor-wallet, here-wallet, intear-wallet), @near-js accounts/providers/signers 2.5, @noble/curves, @noble/hashes, @noble/ciphers, buffer, Fontsource fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono, Big Shoulders Display). MCP server: @modelcontextprotocol/sdk, zod. Tools: Python 3 with the cryptography package, the outlayer CLI, near-cli-rs. No templates.
 - **AI-written code.** Much of the code was written with an AI coding assistant (Claude) and reviewed and tested by the team.

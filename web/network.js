@@ -1,4 +1,4 @@
-// One switch for the whole app: which NEAR network Proctor runs on.
+// One switch for the whole app: which NEAR network Revoke runs on.
 // The site reads VITE_NETWORK at build time, the /api functions read NETWORK
 // at run time; both default to testnet. Mainnet names come from the
 // environment because nothing is deployed there yet: set them after running
