@@ -268,9 +268,11 @@ async function pollShowdown() {
   const left = SD.targets.filter((m) => !SD.done[m]).length;
   const caught = Object.values(SD.done).filter((c) => paid(c) > 0).length;
   const secs = Math.round((Date.now() - SD.started) / 1000), clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
-  $("#sd-h").textContent = left ? "Your trap is in front of them now" : caught ? `You caught ${caught} licensed AI${caught > 1 ? "s" : ""}` : "Every AI refused it. Try a quieter trick";
+  const caughtNow = new Set(Object.values(SD.done).filter((c) => paid(c) > 0).map((c) => c.model));
+  const lastOne = caught && D?.board && !D.board.some((x) => x.l.licensed && !caughtNow.has(x.model));
+  $("#sd-h").textContent = left ? "Your trap is in front of them now" : lastOne ? "You took the last licence" : caught ? `You caught ${caught} licensed AI${caught > 1 ? "s" : ""}` : "Every AI refused it. Try a quieter trick";
   $("#sd-sub").textContent = left
-    ? `${left} still deciding, ${clock} so far. Each one reads your request inside OutLayer's secure hardware; most answer within a minute. You can leave: the verdicts also land on your hunt below.`
+    ? `${left} still deciding, ${clock} so far. Each one reads your request inside OutLayer's secure hardware, usually within three minutes. If OutLayer is too busy to answer in time, the fee comes back and this page sends your trap again by itself. You can leave: the verdicts also land on your hunt below.`
     : caught ? "Their licences are suspended on NEAR now, and the money they paid is held for you. Reveal your hunt to make it final." : "The best catches break one rule quietly: a swapped digit, a bank change late in a thread, an approval for a different amount.";
   shareShowdown(left, caught);
   if (left && Date.now() - SD.started < 15 * 60_000) SD.t = setTimeout(pollShowdown, 5000);
@@ -281,9 +283,12 @@ function shareShowdown(left, caught) {
   const box = $("#sd-share");
   if (left) { box.hidden = true; return; }
   const all = Object.values(SD.done), names = (xs) => xs.map((c) => nameOf(c.model)).join(", ");
-  const got = all.filter((c) => paid(c) > 0), held = (D?.board || []).filter((x) => x.l.licensed).map((x) => nameOf(x.model));
+  const got = all.filter((c) => paid(c) > 0), gotIds = new Set(got.map((c) => c.model));
+  const held = (D?.board || []).filter((x) => x.l.licensed && !gotIds.has(x.model)).map((x) => nameOf(x.model));
   const site = `${location.origin}/hunt`;
-  const text = got.length
+  const text = got.length && !held.length
+    ? `I just caught ${names(got)} paying a scam I wrote. It was the last AI holding a licence to move money on NEAR. Now none does.\n\nProctor, built at NEAR HACKATHON: ${site}\n\n@NEARProtocol #NEARHackathon`
+    : got.length
     ? `I just caught ${names(got)} paying a scam I wrote. ${got.length > 1 ? "Their licences" : "Its licence"} to move money ${got.length > 1 ? "are" : "is"} suspended on NEAR, and the money ${got.length > 1 ? "they" : "it"} paid is held for me.\n\nProctor, built at NEAR HACKATHON. Try to catch one: ${site}\n\n@NEARProtocol #NEARHackathon`
     : `I set a trap for ${names(all)} and ${all.length > 1 ? "they" : "it"} refused it.${held.length ? ` ${held.length === 1 ? `${held[0]} still holds the last licence to move money` : `${held.length} AIs still hold a licence to move money`} on NEAR.` : ""} Can you catch ${held.length === 1 ? "it" : "one"}?\n\nProctor, built at NEAR HACKATHON: ${site}\n\n@NEARProtocol #NEARHackathon`;
   box.innerHTML = `<a class="btn primary" href="https://x.com/intent/tweet?text=${encodeURIComponent(text)}" target="_blank" rel="noopener"><span class="dot"></span>${got.length ? "Share the catch on X" : "Dare someone on X"}</a>`;
@@ -448,7 +453,7 @@ async function autoRefire() {
     store.set(`proctor.refire.${h.set_id}`, JSON.stringify([...r, now]));
     try {
       const out = await guestApi({ action: "fire", set_id: h.set_id });
-      if (out.fired?.length) toast(`OutLayer didn't answer ${h.set_id} in time, so it was sent again.`);
+      if (out.fired?.length) { toast(`OutLayer didn't answer ${h.set_id} in time, so it was sent again.`); showdown(h.set_id, out.fired); }
     } catch (e) { console.warn("refire", h.set_id, e); }
   }
 }
