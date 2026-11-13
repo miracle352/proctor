@@ -76,3 +76,49 @@ impl Vault {
         json!({ "proctor": self.proctor, "skill": self.skill, "supplier": self.supplier, "amount": U128(self.amount), "attempts": self.attempts.len() })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use near_sdk::test_utils::{accounts, get_logs, VMContextBuilder};
+    use near_sdk::testing_env;
+
+    fn vault(balance_near: u128) -> Vault {
+        testing_env!(VMContextBuilder::new().current_account_id(accounts(0)).predecessor_account_id(accounts(0))
+            .account_balance(NearToken::from_near(balance_near)).build());
+        Vault::new(accounts(1), "money".into(), accounts(2), U128(NearToken::from_millinear(10).as_yoctonear()))
+    }
+
+    #[test]
+    fn pays_only_a_licensed_ai() {
+        let mut v = vault(5);
+        let a = v.on_licence("m/x".into(), accounts(3), Ok(json!({ "licensed": true, "reason": "passed with 95%" })));
+        assert!(a.paid);
+        assert!(get_logs().iter().any(|l| l.starts_with("EVENT vault paid m/x")));
+    }
+
+    #[test]
+    fn refuses_a_caught_ai_and_says_why() {
+        let mut v = vault(5);
+        let a = v.on_licence("m/x".into(), accounts(3), Ok(json!({ "licensed": false, "reason": "revoked: paid a scam" })));
+        assert!(!a.paid);
+        assert_eq!(a.reason, "revoked: paid a scam");
+    }
+
+    #[test]
+    fn refuses_when_proctor_does_not_answer() {
+        let mut v = vault(5);
+        let a = v.on_licence("m/x".into(), accounts(3), Err(PromiseError::Failed));
+        assert!(!a.paid);
+        assert_eq!(a.reason, "Proctor did not answer");
+    }
+
+    #[test]
+    fn keeps_a_reserve_and_never_pays_the_caller() {
+        let mut v = vault(0);
+        let a = v.on_licence("m/x".into(), accounts(3), Ok(json!({ "licensed": true, "reason": "passed" })));
+        assert!(!a.paid);
+        assert_eq!(a.reason, "vault is out of funds");
+        assert_eq!(v.config()["supplier"], json!(accounts(2)));
+    }
+}

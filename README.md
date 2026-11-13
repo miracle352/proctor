@@ -60,7 +60,7 @@ Every number comes from the contract; the script prints them live. Sonnet's thre
 Then check the code that decides hunts:
 
 ```sh
-cd contract && cargo test   # 18 tests, including 400 browser-written hunt questions replayed byte for byte
+cd contract && cargo test   # 33 tests, most named after an attack in THREAT_MODEL.md, plus 400 browser-written hunt questions replayed byte for byte
 ```
 
 ## Who it's for
@@ -81,6 +81,10 @@ cd contract && cargo test   # 18 tests, including 400 browser-written hunt quest
 | Nobody, us included, can read a hunt before the AIs answer | `web/src/seal.js` encrypts in the browser; the guest relay receives only ciphertext (`web/api/guest.js`) | **Trusted:** OutLayer's keystore releases the secret only inside its enclave. The keystore's public key reaches the page through our relay, so the page prints it for you to compare with the `outlayer` CLI |
 | Each certificate was marked inside a genuine, approved Intel TDX machine, by the published grader, on the sealed questions | **Check the hardware proof** on any certificate at `/app#check`, or `node tools/proof_check.mjs 982 1146 1196`. Your browser finds OutLayer's result for that run on chain, hashes it, and checks: the hash is the one in the attestation; the report matches the certificate field for field; the build is `grader_version`; the secret opened was `keeper/set_id`; all of it hashes to the report data inside the TDX quote; Intel's signature on the quote chains to Intel's root certificate (Phala's DCAP verifier, `@phala/dcap-qvl`, run in the browser; debug enclaves refused; TCB status shown); the quote's measurements are on `worker.outlayer.testnet`'s approved list. Changing one score breaks the first check; changing one byte of the quote breaks Intel's | Intel's root certificate (built into the verifier) and Intel's signed TCB data. The collateral comes through Phala's public PCCS, but it is signed by Intel, so the relay can't fake it |
 | What the model answered | Only the mark leaves the enclave | **Trusted:** the model provider. Only Qwen 3.8 runs in an attested TEE; Claude, GPT and Gemini run on their makers' servers, and the certificate records that (`sealed: false`) |
+
+[`THREAT_MODEL.md`](THREAT_MODEL.md) goes through 23 ways an AI, an agent's owner, a hunter or we ourselves could cheat, each with what stops it and the test or transaction that shows it, and lists what isn't stopped.
+
+**Builds you can check.** Every contract is built with `cargo near build reproducible-wasm` in a pinned Docker image (`[package.metadata.near.reproducible_build]` in each `Cargo.toml`), so it carries a NEP-330 record of the commit it came from. The CI job `deployed-code-matches-repo` reads that record from each account, checks out the commit, rebuilds, and fails unless the hash equals the code on chain. By hand: `node tools/verify_build.mjs app.proctor-91796.testnet` prints the commit; build it and pass the wasm as a second argument.
 
 Scores are one run per model on 42 questions per test. The catches are single events, real on chain, but not statistics.
 

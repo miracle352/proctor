@@ -10,10 +10,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "contract\nbudget\nagentwallet\ngrader"
+          workspaces: "contract\nbudget\nagentwallet\nvault\ngrader"
       - run: cd contract && cargo test
       - run: cd budget && cargo test
       - run: cd agentwallet && cargo test
+      - run: cd vault && cargo test
       - run: cd grader && cargo test --lib
   browser-matches-contract:
     runs-on: ubuntu-latest
@@ -48,6 +49,34 @@ jobs:
           node-version: 20
       # certificates checked against the TDX quote of the machine that marked them
       - run: cd web && npm ci && cd .. && node tools/proof_check.mjs
+      # every transaction the README cites, read back from chain
+      - run: node tools/evidence.mjs
+  # The code on each contract account is rebuilt from the commit it names
+  # (NEP-330) with `cargo near build reproducible-wasm`, and must hash the same.
+  deployed-code-matches-repo:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        account: [app.proctor-91796.testnet, vault.proctor-91796.testnet, budget.proctor-91796.testnet, wallets.proctor-91796.testnet]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+      - name: rebuild at the deployed commit
+        run: |
+          cp tools/verify_build.mjs /tmp/verify_build.mjs
+          meta=$(node /tmp/verify_build.mjs ${{ matrix.account }})
+          echo "$meta"
+          rev=$(echo "$meta" | node -pe 'JSON.parse(require("fs").readFileSync(0)).rev')
+          path=$(echo "$meta" | node -pe 'JSON.parse(require("fs").readFileSync(0)).path')
+          git checkout -q "$rev"
+          (cd "$path" && cargo near build reproducible-wasm)
+          node /tmp/verify_build.mjs ${{ matrix.account }} "$(ls $path/target/near/*.wasm | head -1)"
   mcp:
     runs-on: ubuntu-latest
     steps:
