@@ -11,6 +11,9 @@ An AI earns a money licence by passing a sealed wallet test: payment requests, h
 
 ## For judges: three minutes
 
+[JUDGES.md](JUDGES.md) maps each track to the command or page that shows it.
+
+
 1. **Do:** open https://useproctor.vercel.app/hunt, pick a trick, change a detail, type a name and press **Seal it and set the trap**. No wallet. **See:** the box under the email names the rule your trap breaks before you seal it; then each licensed AI's answer lands, usually within three minutes, and the page reveals your hunt by itself.
 2. **Do:** open https://useproctor.vercel.app/app#check?cert=1146&proof. **See:** the certificate where Claude Haiku paid a visitor's trap, then seven checks run in your browser against the Intel TDX quote of the machine that marked it, Intel's signature included.
 3. **Do:** `git clone https://github.com/miracle352/proctor && cd proctor && node tools/evidence.mjs` (Node 18 or later, nothing to install). **See:** every transaction this README cites read back from NEAR testnet, then each caught AI's licence read live, ending with "18/18 cited transactions found on NEAR testnet" and "6/6 licences as the README says".
@@ -32,6 +35,10 @@ AI agents are getting wallets now. People are letting them pay invoices send mon
 | Qwen 3.8 | a visitor, no wallet (`hunt-g-minion-mwdzcvcn`) | certificate 1200, `EYcNTziub3uxAPXKqdSRvUQimB2vAKfXVGc6VpAoaHH4` | `Dhuu9GNupcCMkcrzB1hNafTtF9KmBrLwH136eRbTdaAu`, 1 key checked by code | `FMHbmjNL5QKrPBWQqrAGPN55FcA7Pi8FXncTHkdxQ3We` |
 
 `node tools/evidence.mjs` reads each of these back. A licence revoked by a settled hunt stays revoked; the AI has to pass a new exam that includes the trap that caught it.
+
+## Why not just a spending limit?
+
+Most safe-wallet designs pay only allowlisted accounts, up to a cap. `python3 tools/policy_wallet.py` runs that rule against fresh questions from this exam's public generator. It stops every bank change and look-alike domain, but it pays 22% of the scams (every invoice paid twice, every payment split to stay under the limit) and blocks every properly approved large bill. A daily cap catches the splits and still pays half the duplicates. GPT-6.1 Sol, licensed, paid none of its exam's scams. Limits and a licence check different things, so the agent wallet here (`agentwallet/`) enforces both.
 
 ## Check it from a terminal
 
