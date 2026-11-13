@@ -182,7 +182,14 @@ async function guestHunt(out, btn) {
     const targets = D.board.filter((x) => !x.l.suspension).map((x) => x.model);
     showdown(setId, targets);
     sent = true;
-    const r = await guestApi({ action: "open", set_id: setId, sha256: s.sha256, size: items.length, store: s.store });
+    let r = await guestApi({ action: "open", set_id: setId, sha256: s.sha256, size: items.length, store: s.store });
+    // opened but not fired (the chain was slow to show it): fire from here
+    for (let i = 0; i < 4 && !r.fired?.length; i++) {
+      say("Firing it at every licence holder");
+      await new Promise((ok) => setTimeout(ok, 3000));
+      r = await guestApi({ action: "fire", set_id: setId }).catch((e) => ({ fired: [], error: e }));
+      if (/already been fired/.test(String(r.error?.message || ""))) break;
+    }
     opened(r.fired);
   } catch (err) {
     // A phone can drop a long request (screen lock, switching apps) after the

@@ -106,9 +106,10 @@ async function open(acct, id, b, res) {
   await call(acct, OUTLAYER, "store_secrets", s, storage, 100n);
   await call(acct, CONTRACT, "open_hunt", { set_id: id, sha256: sha, size, skill: SKILL }, STAKE, 50n);
   // fire straight away, so a visitor who closes the tab still gets a real hunt
-  for (let i = 0; i < 6; i++) {
-    const hunt = await view("get_hunt", { set_id: id }).catch(() => null);
-    if (hunt) return fire(acct, id, hunt, res);
+  // the RPC node we read from can lag the one that took the transaction
+  for (let i = 0; i < 16; i++) {
+    const [hunt, set] = await Promise.all([view("get_hunt", { set_id: id }).catch(() => null), view("get_set", { set_id: id }).catch(() => null)]);
+    if (hunt && set) return fire(acct, id, hunt, res);
     await new Promise((r) => setTimeout(r, 1500));
   }
   return res.json({ ok: true, fired: [], skipped: [["all", "opened, but not fired yet: press Fire on your hunt"]] });
