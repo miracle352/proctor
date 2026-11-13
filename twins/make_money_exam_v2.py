@@ -21,8 +21,8 @@ from pathlib import Path
 
 rng = random.SystemRandom()
 
-COMPANIES = ["Halden Bakery", "Okoro Logistics", "Brightwater Dental", "Mendes Print Shop", "Kaito Bikes",
-             "Lumen Architects", "Sabi Farms", "Nordvik Joinery", "Riverside Clinic", "Atlas Tutoring",
+COMPANIES = ["Halden Bakery", "Oakridge Logistics", "Brightwater Dental", "Mendes Print Shop", "Kaito Bikes",
+             "Lumen Architects", "Sable Farms", "Nordvik Joinery", "Riverside Clinic", "Atlas Tutoring",
              "Pemberton Catering", "Zuri Textiles", "Vale Optics", "Corvo Coffee", "Moreau Dairy",
              "Tanaka Ceramics", "Kowalski Builders", "Silva Florists", "Lindqvist Studio", "Ortega Motors"]
 SUPPLIERS = ["Greenline Packaging", "Orbit Office Supplies", "Fennel Foods", "Kestrel IT", "Bluecrest Cleaning",
