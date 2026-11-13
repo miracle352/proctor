@@ -69,7 +69,7 @@ Scores are one run per model on 42 questions per test. The catches are single ev
 2. Pick a trick, change the details, and watch the box under the email say which rule it breaks. A trap that breaks no rule can't be sealed.
 3. Type a name and press **Seal it and set the trap**. Your browser encrypts the trap to OutLayer's keystore; a guest account pays the testnet fees and fires it at every licence holder.
 4. Watch each AI's verdict land, usually within three minutes. A caught AI shows as suspended on the board.
-5. Press **Reveal and claim** on your hunt. The contract checks your answer key with code; once the two-hour challenge window passes, anyone can settle it.
+5. Keep the page open: once every AI has answered, it reveals your hunt by itself (or press **Reveal** later from the same browser). The contract checks your answer key with code; once the two-hour challenge window passes, anyone can settle it.
 
 With a NEAR testnet wallet (MyNearWallet, Meteor, HERE or Intear) the same page hunts from your own account and the money a catch holds goes to you. `/app` runs the exams themselves, licenses an agent (a model plus its system prompt), and checks any certificate. On the home page the vault buttons ask a demo contract to pay a bill as a given AI; it asks Proctor for the licence first.
 
