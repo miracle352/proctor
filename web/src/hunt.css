@@ -184,3 +184,7 @@ body:not(.has-wallet) .wallet-only, body.has-wallet .guest-only { display: none;
 .verdicts li.refused { background: var(--green-wash); color: var(--green-ink); }
 .verdicts li.paid { background: var(--red-wash); color: var(--red-ink); }
 .verdicts li b { font-weight: 600; }
+
+.sd-share { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; }
+.sd-share .btn.primary { background: var(--on-night); color: var(--night); }
+.sd-share .btn.primary:hover { background: #fff; }

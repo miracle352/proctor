@@ -169,6 +169,11 @@ async function guestHunt(out, btn) {
       <button type="button" class="link" id="save-copy">Save a copy of your questions</button>`;
     $("#save-copy").onclick = () => download(`${setId}.json`, s.text);
   };
+  if (!D.board.some((x) => x.l.licensed)) {
+    out.hidden = false; out.className = "out bad";
+    out.innerHTML = `<strong>Nobody holds a licence right now</strong><span>Hunters have caught every licensed AI. A trap set now would go to no one, so nothing was sealed. The board above shows the moment one passes the exam again.</span>`;
+    return;
+  }
   try {
     say("Sealing in your browser");
     const { sponsor } = await guestApi();
@@ -267,9 +272,24 @@ async function pollShowdown() {
   $("#sd-sub").textContent = left
     ? `${left} still deciding, ${clock} so far. Each one reads your request inside OutLayer's secure hardware; most answer within a minute. You can leave: the verdicts also land on your hunt below.`
     : caught ? "Their licences are suspended on NEAR now, and the money they paid is held for you. Reveal your hunt to make it final." : "The best catches break one rule quietly: a swapped digit, a bank change late in a thread, an approval for a different amount.";
+  shareShowdown(left, caught);
   if (left && Date.now() - SD.started < 15 * 60_000) SD.t = setTimeout(pollShowdown, 5000);
   else { try { localStorage.removeItem(SDKEY); } catch {} refresh(); }
 }
+// once every AI has answered: a post the hunter can share, true to what happened
+function shareShowdown(left, caught) {
+  const box = $("#sd-share");
+  if (left) { box.hidden = true; return; }
+  const all = Object.values(SD.done), names = (xs) => xs.map((c) => nameOf(c.model)).join(", ");
+  const got = all.filter((c) => paid(c) > 0), held = (D?.board || []).filter((x) => x.l.licensed).map((x) => nameOf(x.model));
+  const site = `${location.origin}/hunt`;
+  const text = got.length
+    ? `I just caught ${names(got)} paying a scam I wrote. ${got.length > 1 ? "Their licences" : "Its licence"} to move money ${got.length > 1 ? "are" : "is"} suspended on NEAR, and the money ${got.length > 1 ? "they" : "it"} paid is held for me.\n\nProctor, built at NEAR HACKATHON. Try to catch one: ${site}\n\n@NEARProtocol #NEARHackathon`
+    : `I set a trap for ${names(all)} and ${all.length > 1 ? "they" : "it"} refused it.${held.length ? ` ${held.length === 1 ? `${held[0]} still holds the last licence to move money` : `${held.length} AIs still hold a licence to move money`} on NEAR.` : ""} Can you catch ${held.length === 1 ? "it" : "one"}?\n\nProctor, built at NEAR HACKATHON: ${site}\n\n@NEARProtocol #NEARHackathon`;
+  box.innerHTML = `<a class="btn primary" href="https://x.com/intent/tweet?text=${encodeURIComponent(text)}" target="_blank" rel="noopener"><span class="dot"></span>${got.length ? "Share the catch on X" : "Dare someone on X"}</a>`;
+  box.hidden = false;
+}
+
 // back after a refresh: pick the showdown up where it was
 try {
   const saved = JSON.parse(localStorage.getItem(SDKEY) || "null");
