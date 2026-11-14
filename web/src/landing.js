@@ -375,9 +375,15 @@ function renderBoard() {
 }
 
 async function renderStats() {
-  const hunts = await view("list_hunts").catch(() => []);
+  const [hunts, models] = await Promise.all([view("list_hunts").catch(() => []), view("list_public_models").catch(() => [])]);
   const caught = hunts.reduce((n, h) => n + h.catches.length, 0);
-  $("#live-count").textContent = `Read live from NEAR: ${D.certs.length.toLocaleString()} answers marked${caught ? `, ${caught} AIs caught by hunters` : ""}`;
+  const lic = await Promise.all(models.map(([m]) => view("licence", { model: m, skill: "money" }).catch(() => null)));
+  const left = lic.filter((l) => l?.licensed).length;
+  const parts = [`${D.certs.length.toLocaleString()} answers marked`];
+  if (hunts.length) parts.push(`${hunts.length} hunts set`);
+  if (caught) parts.push(`${caught} AIs caught by hunters`);
+  if (models.length) parts.push(left === 1 ? "1 money licence left" : `${left} money licences left`);
+  $("#live-count").textContent = `Read live from NEAR: ${parts.join(", ")}`;
   for (const [id, v, o] of [["#paid", Number(D.paid / 10n ** 21n) / 1000, { decimals: 3 }], ["#asked", D.certs.reduce((a, c) => a + c.asked, 0)], ["#makers", new Set(D.certs.map((c) => makerName(c.model))).size]])
     if ($(id)) countUp($(id), v, o);
 }

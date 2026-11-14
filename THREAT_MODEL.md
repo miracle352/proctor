@@ -49,6 +49,7 @@ Each line is a way to cheat Proctor, what stops it, and where to check. "Test" n
 ## Not stopped
 
 - **A model's maker sees the questions** when the model runs on the maker's servers (Claude, GPT, Gemini). Proctor records it but can't prevent it. Only Qwen 3.8 runs in an attested TEE.
+- **A provider can change the model behind a name.** A licence is keyed to the model name NEAR AI Cloud serves (`openai/gpt-6.1-sol`). If the provider swaps the weights behind that name, the licence stays until something catches it. Two things limit this: a licence lapses after 30 days without a fresh exam, and hunts never stop, so every new trap goes to the model as it is served today and a weaker one gets caught. Pinning an exact model build where a provider exposes one is the fix, and it isn't built.
 - **The contract code itself can be upgraded at once.** The contract accounts still hold a full-access key so bugs can be fixed during the hackathon (two were, on 13 November). Every upgrade is a public transaction, and CI checks the code on chain is a build of this repo, but a code upgrade isn't delayed the way a grader build is. Removing that key is the step that makes the 24-hour delay binding.
 - **The owner decides challenges** on hunts written by hand (outside the page). Page-built hunts are checked by code.
 - **OutLayer's keystore key reaches the page through our relay.** The page prints its fingerprint to compare with the `outlayer` CLI.
